@@ -62,6 +62,11 @@ class PrismaStream:
         self.ws = None
         self._buf = bytearray()
         self._reader = None
+        self._dispatcher = None
+        # Events go on a queue; a separate task runs on_event. This keeps _read draining the
+        # Prisma socket at all times, so a slow handler never stalls reading and makes Prisma
+        # back up (which dropped trailing utterances).
+        self._events: asyncio.Queue = asyncio.Queue()
         self._closed = False
 
     async def connect(self):
@@ -77,9 +82,10 @@ class PrismaStream:
             # Gnani's guidance: clean mic 0.45-0.55, telephony 0.65-0.75; conversation
             # silence 600-900 ms so one sentence isn't split at every breath.
             "x-vad-threshold": "0.68" if PHONE_MODE else "0.5",
-            "x-min-silence-ms": "700",
-            "x-min-speech-ms": "200",
-            "x-min-segment-ms": "250",       # drop clicks / stray sounds
+            "x-min-silence-ms": "650",
+            "x-min-speech-ms": "150",
+            # Low floor: 250ms was dropping real short answers ("हाँ खोल", "change करते हैं").
+            "x-min-segment-ms": "120",
             "x-idle-timeout-sec": "600",
             "topic": ("Hindi/Hinglish phone call to a voice assistant that browses Indian government "
                       "websites: live train running status, train numbers, stations, PNR, "
@@ -87,10 +93,15 @@ class PrismaStream:
         }
         if self.keyterms:
             headers["keyterms"] = json.dumps(self.keyterms, ensure_ascii=True)
+        for task in (self._reader, self._dispatcher):   # avoid duplicates on reconnect
+            if task:
+                task.cancel()
         self.ws = await websockets.connect(STT_URL, additional_headers=headers, max_size=None)
         self._reader = asyncio.create_task(self._read())
+        self._dispatcher = asyncio.create_task(self._dispatch())
 
     async def _read(self):
+        """Drain the Prisma socket as fast as possible; hand events to the dispatcher queue."""
         try:
             async for raw in self.ws:
                 if isinstance(raw, bytes):
@@ -99,17 +110,22 @@ class PrismaStream:
                     msg = json.loads(raw)
                 except json.JSONDecodeError:
                     continue
-                try:
-                    await self.on_event(msg)
-                except Exception:
-                    log.exception("STT event handler failed")
+                self._events.put_nowait(msg)
         except websockets.ConnectionClosed as e:
             log.info("STT closed: %s", e)
         except Exception:
             log.exception("STT reader failed")
         finally:
             if not self._closed:
-                await self.on_event({"type": "stt_closed"})
+                self._events.put_nowait({"type": "stt_closed"})
+
+    async def _dispatch(self):
+        while True:
+            msg = await self._events.get()
+            try:
+                await self.on_event(msg)
+            except Exception:
+                log.exception("STT event handler failed")
 
     async def send_pcm(self, data: bytes):
         if not self.ws or self._closed:
@@ -123,6 +139,27 @@ class PrismaStream:
             except websockets.ConnectionClosed:
                 return
 
+    async def flush(self, drain_s: float = 1.3):
+        """Finalize the last utterance before closing. Prisma only emits a segment after
+        trailing silence (min-silence), so on hangup we push ~1s of silence and a commit,
+        then let the dispatcher deliver the final transcript. Without this the last thing
+        the caller said is lost (see Gnani docs: 'end the audio with ~1s of silence')."""
+        if not self.ws or self._closed:
+            return
+        try:
+            silence = b"\x00" * FRAME_BYTES
+            frames = int(drain_s * STT_RATE * 2 / FRAME_BYTES)
+            for _ in range(frames):
+                await self.ws.send(silence)
+                await asyncio.sleep(0.01)
+            try:
+                await self.ws.send(json.dumps({"type": "commit"}))
+            except Exception:
+                pass
+            await asyncio.sleep(0.4)          # give the dispatcher time to deliver it
+        except Exception:
+            pass
+
     async def close(self):
         self._closed = True
         if self.ws:
@@ -130,8 +167,9 @@ class PrismaStream:
                 await self.ws.close()
             except Exception:
                 pass
-        if self._reader:
-            self._reader.cancel()
+        for task in (self._reader, self._dispatcher):
+            if task:
+                task.cancel()
 
 
 async def synthesize(text: str, voice_kind: str = "guide", language: str = "auto",

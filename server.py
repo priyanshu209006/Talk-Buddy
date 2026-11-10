@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 import wave
 from pathlib import Path
@@ -267,8 +268,12 @@ class Call:
             lang = msg.get("detected_language_code")
             speaking = self.is_speaking
 
-            # Fast backchannel check: if assistant is speaking and caller just acknowledges ("हम्म/ok"), don't barge in
-            words = [w.lower() for w in re.findall(r"[\wऀ-෿]+", text)]
+            # Fast backchannel check: if assistant is speaking and caller just acknowledges ("हम्म/ok"), don't barge in.
+            # Defensive: a bug here must never drop the transcript.
+            try:
+                words = [w.lower() for w in re.findall(r"[\wऀ-෿]+", text)]
+            except Exception:
+                words = []
             if speaking and words and all(w in duplex._BACKCHANNEL for w in words):
                 self._duck(False)
                 log.info("backchannel while speaking ignored: %r", text)
@@ -361,6 +366,12 @@ class Call:
         except WebSocketDisconnect:
             pass
         finally:
+            # Flush first: push trailing silence so Prisma finalizes the last utterance, and the
+            # dispatcher (still running) delivers it — so it's logged in the saved recording too.
+            try:
+                await self.stt.flush()
+            except Exception:
+                pass
             self.closed = True
             agent_task.cancel()
             unduck_task.cancel()
