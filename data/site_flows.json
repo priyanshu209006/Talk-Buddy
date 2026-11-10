@@ -1,0 +1,80 @@
+{
+ "enquiry.indianrail.gov.in": [
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://enquiry.indianrail.gov.in/mntes/"
+    },
+    {
+     "do": "type",
+     "target": "Train No./Name",
+     "text": "12309"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://enquiry.indianrail.gov.in/mntes/"
+    },
+    {
+     "do": "click",
+     "target": "Trains B/w Stations"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Bhubaneswar",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "Khurda Road",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  }
+ ],
+ "www.myscheme.gov.in": [
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.myscheme.gov.in/search"
+    },
+    {
+     "do": "type",
+     "target": "Search",
+     "text": "widow pension"
+    },
+    {
+     "do": "type",
+     "target": "beneficiary state filter",
+     "text": "Bihar",
+     "pick": true
+    }
+   ]
+  }
+ ],
+ "hi.wikipedia.org": [
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://hi.wikipedia.org/w/index.php?search=%E0%A4%B8%E0%A4%B0%E0%A4%B8%E0%A5%8B%E0%A4%82+%E0%A4%95%E0%A4%BE+%E0%A4%B8%E0%A4%BE%E0%A4%97&fulltext=1"
+    },
+    {
+     "do": "click",
+     "target": "सरसों का साग"
+    }
+   ]
+  }
+ ]
+}

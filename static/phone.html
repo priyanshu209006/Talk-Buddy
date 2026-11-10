@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dial-a-Browser</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --line:#262b36; --text:#e8eaef; --muted:#8a93a6;
+    --guide:#4fd1a5; --site:#f5b74a; --caller:#7aa7ff; --danger:#ff5d5d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,Segoe UI,Arial,sans-serif}
+  .wrap{display:grid;grid-template-columns:340px 1fr;gap:20px;max-width:1400px;margin:0 auto;padding:20px 16px}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+  h1{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+
+  /* feature phone */
+  .phone{background:linear-gradient(#2b2f38,#1b1e25);border-radius:38px 38px 46px 46px;padding:22px 20px 26px;
+    box-shadow:0 20px 50px #0008, inset 0 1px 0 #ffffff14;width:300px;margin:0 auto}
+  .speaker{width:70px;height:6px;border-radius:3px;background:#0b0c0f;margin:0 auto 14px}
+  .lcd{background:#b9c7a3;color:#1d2618;border-radius:8px;height:230px;padding:10px 12px;font-family:"Courier New",monospace;
+    box-shadow:inset 0 2px 6px #0006;display:flex;flex-direction:column;overflow:hidden}
+  .lcd .top{display:flex;justify-content:space-between;font-size:12px;border-bottom:1px solid #1d261833;padding-bottom:4px}
+  .lcd .who{font-weight:bold;font-size:16px;margin:8px 0 4px}
+  .lcd .last{font-size:12.5px;flex:1;overflow:hidden;white-space:pre-wrap}
+  .lcd .sms{background:#1d2618;color:#b9c7a3;padding:6px 8px;border-radius:4px;font-size:12px;margin-top:6px;display:none}
+  .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:18px}
+  .keys button{background:#3a3f4b;color:#dfe3ea;border:0;border-radius:14px;height:38px;font-size:16px;cursor:default}
+  .callrow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+  .callrow button{border:0;border-radius:18px;height:44px;font-size:15px;font-weight:600;cursor:pointer;color:#fff}
+  #dial{background:#22a35a} #end{background:var(--danger)} button:disabled{opacity:.35;cursor:not-allowed}
+  .opts{margin-top:14px;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+  .opts input[type=text]{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:7px;border-radius:6px}
+  .meter{height:4px;background:#0b0c0f;border-radius:2px;margin-top:10px;overflow:hidden}
+  .meter i{display:block;height:100%;width:0;background:var(--guide);transition:width .08s}
+
+  /* behind the call */
+  .stage{display:grid;grid-template-rows:auto 1fr;gap:16px;min-width:0}
+  .screen{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .bar{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12.5px}
+  .bar .dot{width:9px;height:9px;border-radius:50%;background:#444}
+  .bar .url{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#0d0f13;padding:4px 8px;border-radius:5px}
+  #shot{display:block;width:100%;aspect-ratio:1100/760;object-fit:contain;background:#0d0f13;color:transparent}
+  #shot:not([src]){visibility:hidden}
+  .cols{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;min-height:0}
+  @media(max-width:1100px){.cols{grid-template-columns:1fr}}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:420px}
+  .msg{margin:0 0 10px;padding:8px 10px;border-radius:8px;border-left:3px solid;background:#1d212a}
+  .msg small{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+  .msg.guide{border-color:var(--guide)} .msg.guide small{color:var(--guide)}
+  .msg.site{border-color:var(--site);font-family:Consolas,monospace} .msg.site small{color:var(--site)}
+  .msg.caller{border-color:var(--caller)} .msg.caller small{color:var(--caller)}
+  .msg.cut{opacity:.55;text-decoration:line-through}
+  .msg.ignored{opacity:.45;font-style:italic;border-left-style:dashed}
+  .log{font-family:Consolas,monospace;font-size:12px;color:var(--muted)}
+  .log div{padding:3px 0;border-bottom:1px dashed var(--line)}
+  .log b{color:var(--text)}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-bottom:8px}
+  .legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section>
+    <h1>The caller's phone</h1>
+    <div class="phone">
+      <div class="speaker"></div>
+      <div class="lcd">
+        <div class="top"><span id="sig">▂▄▆ 2G</span><span id="timer">00:00</span></div>
+        <div class="who" id="who">Dial-a-Browser</div>
+        <div class="last" id="last">Press green to call.</div>
+        <div class="sms" id="sms"></div>
+      </div>
+      <div class="meter"><i id="lvl"></i></div>
+      <div class="callrow">
+        <button id="dial">📞 Call</button>
+        <button id="end" disabled>End</button>
+      </div>
+      <div class="keys">
+        <button>1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>6</button>
+        <button>7</button><button>8</button><button>9</button><button>*</button><button>0</button><button>#</button>
+      </div>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="barge" checked> Duplex: talk over the assistant; side talk is ignored (headphones recommended)</label>
+      <input type="text" id="typed" placeholder="(debug) type what the caller says and press Enter">
+    </div>
+  </section>
+
+  <section class="stage">
+    <div class="screen">
+      <div class="bar"><span class="dot"></span><span class="url" id="url">Browser idle</span><span>Agent's browser (server side)</span></div>
+      <img id="shot" alt="Live view of the agent's browser">
+    </div>
+    <div class="cols">
+      <div class="box" id="convo">
+        <div class="legend">
+          <span style="--c:var(--caller)">Caller</span>
+          <span style="--c:var(--guide)">Guide voice (assistant)</span>
+          <span style="--c:var(--site)">Site voice (website's exact words)</span>
+        </div>
+      </div>
+      <div class="box log" id="log"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let ws, ctx, micCtx, micStream, worklet, outGain, playHead = 0, sources = [], t0 = 0, timerId, lastSay = null;
+let sttRate = 16000, ttsRate = 24000;
+
+function addMsg(kind, label, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + kind;
+  d.innerHTML = `<small>${label}</small>`;
+  d.appendChild(document.createTextNode(text));
+  $('convo').appendChild(d);
+  $('convo').scrollTop = 1e9;
+  return d;
+}
+function log(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  $('log').appendChild(d);
+  $('log').scrollTop = 1e9;
+}
+const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+// ---- audio out: 8 kHz PCM chunks scheduled back to back ----
+function playPcm(buf) {
+  const i16 = new Int16Array(buf);
+  if (!i16.length) return;
+  const ab = ctx.createBuffer(1, i16.length, ttsRate);
+  const ch = ab.getChannelData(0);
+  for (let i = 0; i < i16.length; i++) ch[i] = i16[i] / 32768;
+  const src = ctx.createBufferSource();
+  src.buffer = ab;
+  src.connect(outGain);
+  const now = ctx.currentTime;
+  if (playHead < now + 0.03) playHead = now + 0.03;
+  src.start(playHead);
+  playHead += ab.duration;
+  sources.push(src);
+  src.onended = () => { sources = sources.filter(s => s !== src); updateMute(); };
+  updateMute();
+}
+function clearAudio() {
+  sources.forEach(s => { try { s.stop(); } catch {} });
+  sources = [];
+  playHead = 0;
+  if (lastSay) lastSay.classList.add('cut');
+  duck(false);
+  updateMute();
+}
+// Duplex: drop to 25% volume while the caller talks, until we know who they're talking to.
+function duck(on) {
+  if (!outGain) return;
+  const t = ctx.currentTime;
+  outGain.gain.cancelScheduledValues(t);
+  outGain.gain.setTargetAtTime(on ? 0.25 : 1.0, t, on ? 0.04 : 0.12);
+}
+// Without barge-in, mute the mic while the assistant talks so it never hears itself.
+function updateMute() {
+  if (!worklet) return;
+  const talking = sources.length > 0;
+  worklet.port.postMessage({ muted: talking && !$('barge').checked });
+}
+
+async function startCall() {
+  $('dial').disabled = true;
+  // Ask the server which rates this call uses (16k in / 24k out, or 8k/8k in phone mode).
+  try { const c = await (await fetch('/config')).json(); sttRate = c.stt_rate; ttsRate = c.tts_rate; } catch {}
+  ctx = new AudioContext();                       // playback at the device rate
+  outGain = ctx.createGain();
+  outGain.connect(ctx.destination);
+  // Capture in its own context at the STT rate: the browser's resampler has a proper
+  // anti-aliasing filter, which keeps consonants crisp for Prisma.
+  try { micCtx = new AudioContext({ sampleRate: sttRate }); } catch { micCtx = new AudioContext(); }
+  await micCtx.audioWorklet.addModule('/static/pcm-worklet.js');
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
+    });
+    const mic = micCtx.createMediaStreamSource(micStream);
+    worklet = new AudioWorkletNode(micCtx, 'phone-line-capture', { processorOptions: { target: sttRate } });
+    const analyser = micCtx.createAnalyser();
+    mic.connect(analyser);
+    mic.connect(worklet);
+    const data = new Uint8Array(analyser.fftSize);
+    (function meter() {
+      if (!ctx) return;
+      analyser.getByteTimeDomainData(data);
+      let peak = 0; for (const v of data) peak = Math.max(peak, Math.abs(v - 128));
+      $('lvl').style.width = Math.min(100, peak * 1.6) + '%';
+      requestAnimationFrame(meter);
+    })();
+  } catch (err) {
+    micStream = null; worklet = null;
+    log('<b>no microphone</b> (' + esc(err.message) + '). Typed mode: use the box under the phone.');
+  }
+
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/call`);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => {
+    if (worklet) worklet.port.onmessage = e => { if (ws && ws.readyState === 1) ws.send(e.data); };
+    ws.send(JSON.stringify({ type: 'barge_in', enabled: $('barge').checked }));
+    $('end').disabled = false;
+    t0 = Date.now();
+    timerId = setInterval(() => {
+      const s = Math.floor((Date.now() - t0) / 1000);
+      $('timer').textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    }, 500);
+    $('last').textContent = 'Calling…';
+  };
+  ws.onmessage = e => {
+    if (typeof e.data !== 'string') return playPcm(e.data);
+    const m = JSON.parse(e.data);
+    switch (m.type) {
+      case 'say':
+        lastSay = addMsg(m.voice, m.voice === 'site'
+          ? `Site voice · website text${m.verified != null ? ` · ✓ ${Math.round(m.verified * 100)}% found on page` : ''}`
+          : 'Guide voice', m.text);
+        $('last').textContent = m.text;
+        break;
+      case 'heard': {
+        const label = `Caller${m.lang ? ' · ' + m.lang : ''}${m.latency ? ' · ' + m.latency + ' ms' : ''}` +
+          (m.ignored ? ` · ignored: ${m.ignored.toLowerCase().replace('_', ' ')}${m.why ? ' (' + m.why + ')' : ''}` : '');
+        const d = addMsg('caller', label, m.text);
+        if (m.ignored) d.classList.add('ignored');
+        if (m.ignored) duck(false);
+        break;
+      }
+      case 'duck': duck(m.on); break;
+      case 'quota':
+        log('<b style="color:var(--danger)">LLM unavailable</b> ' + esc(m.text));
+        $('last').textContent = 'Assistant temporarily unavailable (LLM quota).';
+        break;
+      case 'clear_audio': clearAudio(); log('<b>barge-in</b> caller interrupted, audio stopped'); break;
+      case 'action':
+        if (m.name !== 'say') log(`<b>${esc(m.name)}</b> ${esc(JSON.stringify(m.args))}`);
+        break;
+      case 'screen':
+        $('shot').src = 'data:image/jpeg;base64,' + m.jpeg;
+        $('url').textContent = m.url;
+        break;
+      case 'sms':
+        $('sms').style.display = 'block';
+        $('sms').textContent = '✉ SMS: ' + m.text;
+        log('<b>sms</b> ' + esc(m.text));
+        break;
+      case 'status': log('<b>status</b> ' + esc(m.text)); break;
+      case 'log': log(esc(m.text)); break;
+      case 'hangup': endCall(); break;
+    }
+  };
+  ws.onclose = () => endCall();
+}
+
+function endCall() {
+  if (ws && ws.readyState <= 1) ws.close();
+  ws = null;
+  clearInterval(timerId);
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  setTimeout(() => {
+    if (ctx) { ctx.close(); ctx = null; }
+    if (micCtx) { micCtx.close(); micCtx = null; }
+  }, 300);
+  worklet = null;
+  $('dial').disabled = false;
+  $('end').disabled = true;
+  $('last').textContent = 'Call ended.';
+}
+
+$('dial').onclick = () => startCall().catch(err => { log('error: ' + esc(err.message)); $('dial').disabled = false; });
+$('end').onclick = endCall;
+$('barge').onchange = () => {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'barge_in', enabled: $('barge').checked }));
+  updateMute();
+};
+$('typed').onkeydown = e => {
+  if (e.key === 'Enter' && ws && ws.readyState === 1 && e.target.value.trim()) {
+    ws.send(JSON.stringify({ type: 'typed', text: e.target.value.trim() }));
+    e.target.value = '';
+  }
+};
+</script>
+</body>
+</html>

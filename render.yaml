@@ -1,0 +1,17 @@
+# Render Blueprint: New > Blueprint > pick this repo. Secrets are entered in the dashboard.
+services:
+  - type: web
+    name: dial-a-browser
+    runtime: docker
+    region: singapore          # closest Render region to India (Indian sites + Gnani latency)
+    plan: standard             # 2 GB RAM: Chromium + the app don't fit in 512 MB (free/starter)
+    healthCheckPath: /config
+    envVars:
+      - key: GNANI_API_KEY
+        sync: false            # prompts you for the value; never committed
+      - key: NEBIUS_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HEADLESS
+        value: "1"
