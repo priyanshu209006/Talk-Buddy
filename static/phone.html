@@ -97,8 +97,7 @@
       <div class="box" id="convo">
         <div class="legend">
           <span style="--c:var(--caller)">Caller</span>
-          <span style="--c:var(--guide)">Guide voice (assistant)</span>
-          <span style="--c:var(--site)">Site voice (website's exact words)</span>
+          <span style="--c:var(--guide)">Assistant</span>
         </div>
       </div>
       <div class="box log" id="log"></div>
@@ -219,10 +218,10 @@ async function startCall() {
     const m = JSON.parse(e.data);
     switch (m.type) {
       case 'say':
-        lastSay = addMsg(m.voice, m.voice === 'site'
-          ? `Site voice · website text${m.verified != null ? ` · ✓ ${Math.round(m.verified * 100)}% found on page` : ''}`
-          : 'Guide voice', m.text);
+        lastSay = addMsg('guide', 'Assistant', m.text);
         $('last').textContent = m.text;
+        break;
+      case 'pong':
         break;
       case 'heard': {
         const label = `Caller${m.lang ? ' · ' + m.lang : ''}${m.latency ? ' · ' + m.latency + ' ms' : ''}` +
@@ -255,8 +254,19 @@ async function startCall() {
       case 'hangup': endCall(); break;
     }
   };
-  ws.onclose = () => endCall();
+  ws.onclose = e => {
+    log(`<b>Call ended</b>${e.reason ? ' (' + esc(e.reason) + ')' : ''}`);
+    endCall();
+  };
+  ws.onerror = err => {
+    log(`<b>Connection error</b>`);
+  };
 }
+
+let pingIntervalId = null;
+setInterval(() => {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'ping' }));
+}, 15000);
 
 function endCall() {
   if (ws && ws.readyState <= 1) ws.close();

@@ -25,7 +25,7 @@ FRAME_BYTES = 1024          # Prisma expects 1024-byte PCM frames
 # Language Prisma should listen for first. The streaming endpoint takes exactly ONE locale
 # (or "indic-auto"); a comma list is rejected. It's a hint, not a lock: clearly Tamil/English
 # speech is still transcribed as such. A known language helps short clips most.
-STT_LANGS = os.environ.get("STT_LANGS", "hi-IN")
+STT_LANGS = os.environ.get("STT_LANGS", "indic-auto")
 
 TTS_MODEL = "timbre-v3.0"   # every v3.0 voice speaks all 10 languages
 
@@ -87,9 +87,9 @@ class PrismaStream:
             # Low floor: 250ms was dropping real short answers ("हाँ खोल", "change करते हैं").
             "x-min-segment-ms": "120",
             "x-idle-timeout-sec": "600",
-            "topic": ("Hindi/Hinglish phone call to a voice assistant that browses Indian government "
-                      "websites: live train running status, train numbers, stations, PNR, "
-                      "government schemes (yojana, pension), weather"),
+            "topic": ("Multilingual phone call (English, Hindi, Hinglish, regional languages) to a voice assistant "
+                      "that browses websites: Wikipedia, search, live train running status, train numbers, "
+                      "government schemes, weather"),
         }
         if self.keyterms:
             headers["keyterms"] = json.dumps(self.keyterms, ensure_ascii=True)

@@ -365,7 +365,9 @@ class Call:
                     await self.stt.send_pcm(m["bytes"])
                 elif m.get("text"):
                     ctl = json.loads(m["text"])
-                    if ctl.get("type") == "barge_in":
+                    if ctl.get("type") == "ping":
+                        await self.ui({"type": "pong"})
+                    elif ctl.get("type") == "barge_in":
                         self.barge_in = bool(ctl.get("enabled"))
                     elif ctl.get("type") == "typed":      # debug: type instead of speaking
                         await self.on_stt({"type": "transcript", "text": ctl.get("text", "")})

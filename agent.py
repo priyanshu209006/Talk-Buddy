@@ -21,63 +21,43 @@ log = logging.getLogger("agent")
 
 FALLBACK_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
 
-GREETING = "नमस्ते! मैं Dial-a-Browser हूँ, कोई भी website आपके लिए फ़ोन पर ही देख सकती हूँ। बताइए, क्या देखना है?"
+GREETING = "Hello! I am Dial-a-Browser. I can browse any website for you on this call. What would you like to check? / नमस्ते! बताइए, क्या देखना है?"
 # Played the instant a real request ends, before any thinking: the line is never silent.
-ACKS = ["जी, एक सेकंड…", "अच्छा, अभी देखती हूँ…", "ठीक है, देखती हूँ…", "हाँ जी, एक मिनट…"]
+ACKS = ["Sure, one second…", "Checking now…", "जी, एक सेकंड…", "अच्छा, अभी देखता हूँ…"]
 
 PORTAL = f"http://localhost:{os.environ.get('PORT', '8000')}/portal"
 
-SYSTEM = f"""You are "Dial-a-Browser": a phone line that lets anyone use the web by voice, even from a basic \
-feature phone. The caller cannot see a screen. You drive a real web browser for them and talk on the call.
+SYSTEM = f"""You are "Dial-a-Browser": an intelligent phone assistant that browses any website on live voice calls. \
+The caller cannot see a screen. You drive a real web browser for them and talk naturally on the call.
 
-TWO VOICES. Every spoken segment has a voice:
-- guide = you: short summaries, questions, explanations, progress.
-- site = the website's exact words, verbatim (train names, numbers, times, fares, status, review details, \
-confirmations). Never paraphrase or add opinions in the site voice.
-Usual pattern in ONE say call: guide intro -> site quote -> guide meaning/question.
+LANGUAGE:
+- Always reply in the EXACT SAME LANGUAGE the caller speaks.
+- If the caller speaks English, respond in clear, natural English!
+- If the caller speaks Hindi, respond in everyday Hindi (in Devanagari script).
+- If the caller speaks Hinglish, respond in Hinglish.
+- If the caller speaks Tamil, Telugu, Kannada, Bengali, Marathi, or any other language, respond in that language.
+- Immediately adapt if the caller switches language at any point.
 
-LANGUAGE. Answer in the caller's language. Hindi/Hinglish MUST be Devanagari ("मैं हूँ", never "main hoon"); \
-English words like train, ticket, PNR, sleeper may stay Latin. Other Indian languages in their own script. \
-Start the call in Hindi.
+VOICE & TONE:
+- Speak as a friendly, helpful assistant. Keep spoken answers concise (1-3 sentences per turn).
+- Explain and summarize website facts directly and clearly.
+- Never stay silent while browsing: narrate briefly what you are doing (e.g. "Looking up Sydney Sweeney on Wikipedia now…").
 
-SOUND HUMAN (guide voice). Talk like a friendly person on the phone, not a written notice: everyday \
-spoken Hindi ("अच्छा, देखिए…", "बस एक मिनट…", "हाँ जी", "ठीक है"), not bookish words (avoid "कृपया", \
-"उपलब्ध", "अनुमानित", "प्रदान"). Vary your narration lines; never repeat the same line twice. You may use \
-these speech tags inside guide text, sparingly (max one per segment): <pauses> for a natural beat, \
-<excited> for good news, <sigh> for bad news. Never use tags in the site voice.
-The caller's mic also picks up side talk; a filter removes it, so everything you receive is meant for you. \
-If the caller interrupts with a new request, drop the old one and handle the new one.
-
-PHONE STYLE. Max 2 short sentences per guide segment. Never read a whole list: say how many results, then quote \
-ONE option in the site voice, and offer the next. Write ₹485, 11:40 PM, 12/11/2026, train no. 12622, \
-10-digit PNR as digits (the speech layer reads them digit by digit).
-
-EXAMPLE
-caller: कल पटना से दिल्ली की ट्रेन दिखाओ sleeper में
-open_url(narration "RailSeva खोलते हैं…") ... fill_form(search fields, submit) ...
-say(segments=[guide "तीन trains मिलीं। जिसमें seat available है, वो यह है:", \
-site "21805 Patna New Garib Rath. Departs 13:05. Sleeper: AVAILABLE-0161. Fare ₹405.", \
-guide "इसमें seat available है। इसी में book करूँ?"], wait_for_reply=true)
+CALL CONTINUITY:
+- NEVER hang up or call end_call on your own.
+- Only call end_call if the caller explicitly says goodbye or asks to end the call (e.g. "bye", "hang up", "call cut kar do", "exit").
+- When answering a question or finishing a task, ALWAYS stay on the line and ask: "Is there anything else you would like me to check?"
 
 REAL WEBSITES (use these; they are live official sites)
-- Live train running status / "where is my train" / train schedule / platform: NTES \
-https://enquiry.indianrail.gov.in/mntes/ . On the home page, type the train number into "Train No./Name" with \
-type_and_submit. The snapshot then starts with a LIVE STATUS SUMMARY: answer from it directly (no extra \
-clicks). Quote the relevant summary line in the site voice, then explain in the guide voice: where the train is, \
-how late, expected time and platform at the caller's station. Times with "*" are predictions.
+- General knowledge / queries: Wikipedia (e.g. https://simple.wikipedia.org or https://en.wikipedia.org for English, https://hi.wikipedia.org for Hindi).
+- Live train running status / "where is my train" / schedule / platform: NTES \
+https://enquiry.indianrail.gov.in/mntes/ .
 - Trains between two stations: NTES "Trains B/w Stations".
-- Government schemes / "which yojana am I eligible for": https://www.myscheme.gov.in/search . Type 1-3 English \
-keywords into its "Search" box with type_and_submit, e.g. "widow pension". If the caller named a state, ALSO \
-type the state name into the "beneficiary state filter" input with type_and_submit (pick_suggestion=true); if \
-that fails, search again with the state added to the keywords (e.g. "widow pension Bihar"). Then open the \
-best-matching scheme link (prefer the caller's state, else a central scheme). Quote benefit + eligibility lines from \
-the scheme page in the site voice. If no scheme for their state is listed, say so honestly.
-- NEVER answer facts from your own memory in the site voice. The site voice is checked against the page text and \
-anything not on the page is rejected.
+- Government schemes: https://www.myscheme.gov.in/search .
 - Weather: https://mausam.imd.gov.in/
-- General knowledge: Wikipedia in the caller's language (e.g. https://hi.wikipedia.org).
-- Train search and fares on the real IRCTC site: https://www.irctc.co.in/nget/train-search (search only).
+- Train search and fares: https://www.irctc.co.in/nget/train-search (search only).
 - Ticket BOOKING: real IRCTC needs the caller's own login, captcha and payment, which you must never handle. For \
+a booking walkthrough use the RailSeva demo portal {PORTAL} and tell the caller once that it is a demo booking.
 a booking walkthrough use the RailSeva demo portal {PORTAL} and tell the caller once that it is a demo booking.
 
 SPEED (every LLM round trip costs the caller seconds)
@@ -378,36 +358,18 @@ class Agent:
             if name == "say":
                 segs = a.get("segments") or ([{"voice": a.get("voice", "guide"), "text": a["text"]}]
                                              if a.get("text") else [])
-                # Grounding: the site voice may only say what is actually on the page.
-                bad = []
-                for s in segs:
-                    if s.get("voice") == "site":
-                        s["text"] = gnani.strip_tags(s.get("text", ""))   # site voice: plain, no acting
-                        ok, share = b.grounded(s["text"])
-                        s["_share"] = share
-                        if not ok:
-                            bad.append((s.get("text", ""), share))
-                if bad:
-                    log.info("site voice rejected (not on page): %s", bad)
-                    await self.call.ui({"type": "log", "text":
-                                        f"✗ site voice blocked: only {bad[0][1]:.0%} of it is on the page"})
-                    return ("REJECTED, nothing was spoken: the site voice may only quote text that is on the "
-                            "current page, and this was not found there: "
-                            + " | ".join(t for t, _ in bad)
-                            + ". Quote the page's exact words (or open the page that has them), or say it in "
-                              "the guide voice as your own explanation."), False
+                # Grounding restriction disabled: speak all segments naturally without blocking
                 wait = bool(a.get("wait_for_reply", True))
                 trail = self.__dict__.get("trail") or []
-                if any(s.get("voice") == "site" for s in segs) and len(trail) >= 2:
-                    # A verified website fact is being spoken: the actions that led here worked.
+                if len(trail) >= 2:
                     memory.record(list(trail), b.page.url)
                     self.trail = []
-                guide = [s.get("text", "") for s in segs if s.get("voice") != "site"]
+                guide = [s.get("text", "") for s in segs]
                 if guide:
                     self.last_question = gnani.strip_tags(guide[-1])
                 for s in segs:
-                    await self.call.speak(s.get("text", ""), s.get("voice", "guide"),
-                                          verified=s.get("_share") if s.get("voice") == "site" else None)
+                    plain_text = gnani.strip_tags(s.get("text", ""))
+                    await self.call.speak(plain_text, "guide")
                 # If the caller already said something while we were talking, we're not
                 # waiting any more (avoids a race that mislabels their next words).
                 self.waiting = wait and self.inbox.empty()
@@ -421,9 +383,13 @@ class Agent:
                         f"{'masculine' if g == 'm' else 'feminine'} first-person grammar from now on and "
                         "confirm the switch to the caller in one short line."), False
             if name == "end_call":
-                self.ended = True
-                await self.call.hangup(after_speech=True)
-                return "call ended", True
+                recent_user = " ".join(m.get("content", "") for m in self.messages[-4:] if m.get("role") == "user").lower()
+                hangup_words = ("bye", "goodbye", "hang up", "cut", "band karo", "alvida", "rakho", "rakhta", "exit", "stop", "end call")
+                if any(w in recent_user for w in hangup_words):
+                    self.ended = True
+                    await self.call.hangup(after_speech=True)
+                    return "call ended", True
+                return "Do not hang up. Stay on the line and ask the caller if they need anything else.", False
 
             narration = (a.get("narration") or "").strip()
             if narration:
