@@ -377,6 +377,13 @@ class Browser:
             title = (await self.page.title()).lower()
             if any(w in title for w in ("just a moment", "security check", "checking your browser", "attention required")):
                 await self.page.wait_for_timeout(2500)
+            # Dismiss search engine consent banners (Google, Bing) if present
+            for sel in ("#L2AGLb", "button:has-text('Accept all')", "button:has-text('I agree')", "#bnp_btn_accept"):
+                loc = self.page.locator(sel).first
+                if await loc.is_visible(timeout=250):
+                    await loc.click(timeout=800)
+                    await self.page.wait_for_timeout(300)
+                    break
         except Exception:
             pass
         await self._settle()
