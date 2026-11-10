@@ -545,6 +545,12 @@ class Browser:
                         await self.page.goto(url, wait_until="domcontentloaded", timeout=20000)
                     except PWTimeout:
                         pass
+                    try:
+                        title = (await self.page.title()).lower()
+                        if any(w in title for w in ("just a moment", "security check", "checking your browser", "attention required")):
+                            await self.page.wait_for_timeout(2500)
+                    except Exception:
+                        pass
                     await self._settle()
                     done.append(f"{i}. open {url} ✓")
                 elif do in ("type", "click", "select"):
