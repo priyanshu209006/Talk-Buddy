@@ -111,7 +111,9 @@ async def shared_browser():
         # Headless is the stable default. HEADLESS=0 runs a real window parked off-screen,
         # which IRCTC accepts, but on this machine Edge sometimes closed that window by itself.
         headless = os.environ.get("HEADLESS", "1") != "0"
-        args = [] if headless else ["--window-position=-32000,-32000", "--window-size=1100,860"]
+        args = ["--no-sandbox", "--disable-dev-shm-usage"]
+        if not headless:
+            args.extend(["--window-position=-32000,-32000", "--window-size=1100,860"])
         channel = os.environ.get("BROWSER_CHANNEL") or None
         try:
             b = await pw.chromium.launch(headless=headless, channel=channel, args=args)
