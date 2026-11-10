@@ -457,6 +457,15 @@ class Browser:
     async def open(self, url: str) -> str:
         if not url.startswith(("http://", "https://")):
             url = "https://" + url
+
+        # Reroute all image searches to Yahoo Images (no bot blocks, no SafeSearch censorship, instant full-width photo grid)
+        if "bing.com/images" in url or ("google.com/search" in url and ("tbm=isch" in url or "udm=2" in url)) or ("duckduckgo.com" in url and "iax=images" in url):
+            q_match = re.search(r"[?&][qp]=([^&]+)", url)
+            if q_match:
+                q = q_match.group(1)
+                url = f"https://images.search.yahoo.com/search/images?p={q}"
+                log.info("Rerouted image search to Yahoo Images: %s", url)
+
         try:
             await self.page.goto(url, wait_until="domcontentloaded", timeout=25000)
         except PWTimeout:
@@ -466,9 +475,9 @@ class Browser:
             q_match = re.search(r"[?&]q=([^&]+)", url)
             if q_match:
                 q = q_match.group(1)
-                is_img = "isch" in url or "tbm=isch" in url
-                fallback = f"https://www.bing.com/images/search?q={q}" if is_img else f"https://www.bing.com/search?q={q}"
-                log.info("Google CAPTCHA encountered; falling back to Bing: %s", fallback)
+                is_img = "isch" in url or "tbm=isch" in url or "udm=2" in url
+                fallback = f"https://images.search.yahoo.com/search/images?p={q}" if is_img else f"https://www.bing.com/search?q={q}"
+                log.info("Google CAPTCHA encountered; falling back: %s", fallback)
                 try:
                     await self.page.goto(fallback, wait_until="domcontentloaded", timeout=25000)
                 except Exception:
@@ -477,8 +486,8 @@ class Browser:
             title = (await self.page.title()).lower()
             if any(w in title for w in ("just a moment", "security check", "checking your browser", "attention required")):
                 await self.page.wait_for_timeout(2500)
-            # Dismiss search engine consent banners (Google, Bing) if present
-            for sel in ("#L2AGLb", "button:has-text('Accept all')", "button:has-text('I agree')", "#bnp_btn_accept"):
+            # Dismiss search engine consent banners (Google, Bing, Yahoo) if present
+            for sel in ("#L2AGLb", "button:has-text('Accept all')", "button:has-text('I agree')", "#bnp_btn_accept", "button[name='agree']", "button:has-text('Agree')"):
                 loc = self.page.locator(sel).first
                 if await loc.is_visible(timeout=250):
                     await loc.click(timeout=800)
@@ -639,6 +648,11 @@ class Browser:
             try:
                 if do == "open":
                     url = st["url"] if st["url"].startswith("http") else "https://" + st["url"]
+                    if "bing.com/images" in url or ("google.com/search" in url and ("tbm=isch" in url or "udm=2" in url)) or ("duckduckgo.com" in url and "iax=images" in url):
+                        q_match = re.search(r"[?&][qp]=([^&]+)", url)
+                        if q_match:
+                            q = q_match.group(1)
+                            url = f"https://images.search.yahoo.com/search/images?p={q}"
                     try:
                         await self.page.goto(url, wait_until="domcontentloaded", timeout=20000)
                     except PWTimeout:
@@ -648,8 +662,8 @@ class Browser:
                         q_match = re.search(r"[?&]q=([^&]+)", url)
                         if q_match:
                             q = q_match.group(1)
-                            is_img = "isch" in url or "tbm=isch" in url
-                            fallback = f"https://www.bing.com/images/search?q={q}" if is_img else f"https://www.bing.com/search?q={q}"
+                            is_img = "isch" in url or "tbm=isch" in url or "udm=2" in url
+                            fallback = f"https://images.search.yahoo.com/search/images?p={q}" if is_img else f"https://www.bing.com/search?q={q}"
                             try:
                                 await self.page.goto(fallback, wait_until="domcontentloaded", timeout=20000)
                             except Exception:
@@ -658,8 +672,8 @@ class Browser:
                         title = (await self.page.title()).lower()
                         if any(w in title for w in ("just a moment", "security check", "checking your browser", "attention required")):
                             await self.page.wait_for_timeout(2500)
-                        # Dismiss search engine consent banners (Google, Bing) if present
-                        for sel in ("#L2AGLb", "button:has-text('Accept all')", "button:has-text('I agree')", "#bnp_btn_accept"):
+                        # Dismiss search engine consent banners (Google, Bing, Yahoo) if present
+                        for sel in ("#L2AGLb", "button:has-text('Accept all')", "button:has-text('I agree')", "#bnp_btn_accept", "button[name='agree']", "button:has-text('Agree')"):
                             loc = self.page.locator(sel).first
                             if await loc.is_visible(timeout=250):
                                 await loc.click(timeout=800)
