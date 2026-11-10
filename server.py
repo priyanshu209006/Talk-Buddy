@@ -8,6 +8,7 @@ import time
 import wave
 from pathlib import Path
 
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).with_name(".env"))
@@ -27,7 +28,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 log = logging.getLogger("server")
 
 STATIC = Path(__file__).with_name("static")
-app = FastAPI(title="Dial-a-Browser")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(_prewarm())
+    yield
+
+app = FastAPI(title="Dial-a-Browser", lifespan=lifespan)
 app.include_router(portal.router)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
@@ -84,14 +91,15 @@ async def _prewarm():
     log.info("tts cache warm: %d lines", len(_TTS_CACHE))
 
 
-@app.on_event("startup")
-async def _startup():
-    asyncio.create_task(_prewarm())
-
-
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return RedirectResponse("/phone")
+
+
+@app.api_route("/healthz", methods=["GET", "HEAD"])
+@app.api_route("/health", methods=["GET", "HEAD"])
+async def health():
+    return Response(content="OK", media_type="text/plain", status_code=200)
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -99,13 +107,13 @@ async def favicon():
     return Response(content=b"", media_type="image/x-icon", status_code=204)
 
 
-@app.get("/config")
+@app.api_route("/config", methods=["GET", "HEAD"])
 async def config():
     return {"stt_rate": gnani.STT_RATE, "tts_rate": gnani.TTS_RATE, "phone_mode": gnani.PHONE_MODE}
 
 
-@app.get("/phone")
-@app.get("/phone/")
+@app.api_route("/phone", methods=["GET", "HEAD"])
+@app.api_route("/phone/", methods=["GET", "HEAD"])
 async def phone():
     return FileResponse(STATIC / "phone.html", headers={"Cache-Control": "no-store"})
 
@@ -158,9 +166,16 @@ class Call:
                 pass
 
     async def push_screen(self):
-        img = await self.browser.screenshot_b64()
-        if img:
-            await self.ui({"type": "screen", "url": self.browser.page.url, "jpeg": img})
+        if self.closed:
+            return
+        try:
+            img = await self.browser.screenshot_b64()
+            if img:
+                raw_url = self.browser.page.url if (self.browser and self.browser.page) else ""
+                url = "Ready: Dial-a-Browser" if (not raw_url or raw_url == "about:blank") else raw_url
+                await self.ui({"type": "screen", "url": url, "jpeg": img})
+        except Exception as e:
+            log.warning("push_screen failed: %s", e)
 
     def pop_notes(self):
         n, self.notes = self.notes, []
@@ -301,7 +316,9 @@ class Call:
             # Instant acknowledgement for a multi-word request:
             # cached audio, plays within ~100 ms while the agent thinks and browses.
             if len(text.split()) >= 3:
-                asyncio.create_task(self.speak(random.choice(ACKS), "guide"))
+                is_en = bool(lang and lang.startswith("en"))
+                ack = random.choice(["Sure, one second…", "Checking now…", "Looking that up…"]) if is_en else random.choice(["जी, एक सेकंड…", "अच्छा, अभी देखता हूँ…", "देख रहा हूँ…"])
+                asyncio.create_task(self.speak(ack, "guide"))
             self.agent.hear(f"{text}" + (f"  [detected language: {lang}]" if lang else ""))
         elif t == "error":
             await self.ui({"type": "log", "text": f"STT error: {msg.get('message')}"})
@@ -342,6 +359,8 @@ class Call:
         await self.ui({"type": "status", "text": "Connecting…"})
         await self.ui({"type": "config", "stt_rate": gnani.STT_RATE, "tts_rate": gnani.TTS_RATE})
         await self.browser.start()
+        await self.browser.init_page()
+        await self.push_screen()
         await self.stt.connect()
         loop = asyncio.get_running_loop()
 

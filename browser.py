@@ -217,6 +217,12 @@ async def shared_browser():
             "--no-first-run",
             "--no-service-autorun",
             "--password-store=basic",
+            "--disable-gpu",
+            "--disable-software-rasterizer",
+            "--renderer-process-limit=1",
+            "--no-zygote",
+            "--js-flags=--max-old-space-size=128",
+            "--mute-audio",
         ]
         if not headless:
             args.extend(["--window-position=-32000,-32000", "--window-size=1280,800"])
@@ -284,8 +290,90 @@ class Browser:
                 "Accept-Language": "en-IN,en-US;q=0.9,en;q=0.8,hi;q=0.7",
             },
         )
+        # Block known telemetry and ad networks to save RAM and avoid tracker timeouts
+        async def block_trackers(route):
+            u = route.request.url.lower()
+            if any(t in u for t in (
+                "google-analytics.com",
+                "googlesyndication.com",
+                "doubleclick.net",
+                "px.ads.linkedin.com",
+                "connect.facebook.net",
+                "adservice.google",
+                "hotjar.com",
+                "clarity.ms",
+            )):
+                await route.abort()
+            else:
+                await route.continue_()
+
+        await self._ctx.route("**/*", block_trackers)
         await self._ctx.add_init_script(STEALTH_JS)
         self.page = await self._ctx.new_page()
+
+    async def init_page(self):
+        try:
+            await self.page.set_content("""<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    margin: 0;
+    padding: 30px;
+    background: #0f1115;
+    color: #e8eaef;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 85vh;
+    text-align: center;
+    box-sizing: border-box;
+  }
+  .card {
+    background: #171a21;
+    border: 1px solid #262b36;
+    border-radius: 16px;
+    padding: 36px 44px;
+    max-width: 600px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(79, 209, 165, 0.15);
+    color: #4fd1a5;
+    border: 1px solid rgba(79, 209, 165, 0.3);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  h1 {
+    color: #ffffff;
+    font-size: 26px;
+    margin: 0 0 10px;
+  }
+  p {
+    color: #8a93a6;
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">● Live Browser Connected</div>
+    <h1>Dial-a-Browser</h1>
+    <p>Ready to browse the web for you on this call. Ask to search for images of any person, look up live information, check trains, or visit any website!</p>
+  </div>
+</body>
+</html>""")
+        except Exception as e:
+            log.warning("init_page failed: %s", e)
 
     def alive(self) -> bool:
         return bool(self._browser and self._browser.is_connected() and self.page and not self.page.is_closed())
@@ -358,7 +446,7 @@ class Browser:
 
     async def screenshot_b64(self) -> str | None:
         try:
-            png = await self.page.screenshot(type="jpeg", quality=55)
+            png = await self.page.screenshot(type="jpeg", quality=55, timeout=4000)
             return base64.b64encode(png).decode()
         except Exception:
             return None
@@ -373,6 +461,18 @@ class Browser:
             await self.page.goto(url, wait_until="domcontentloaded", timeout=25000)
         except PWTimeout:
             pass
+        # Auto-detect and bypass Google bot CAPTCHA (/sorry/index)
+        if "google.com/sorry" in self.page.url or "sorry/index" in self.page.url:
+            q_match = re.search(r"[?&]q=([^&]+)", url)
+            if q_match:
+                q = q_match.group(1)
+                is_img = "isch" in url or "tbm=isch" in url
+                fallback = f"https://www.bing.com/images/search?q={q}" if is_img else f"https://www.bing.com/search?q={q}"
+                log.info("Google CAPTCHA encountered; falling back to Bing: %s", fallback)
+                try:
+                    await self.page.goto(fallback, wait_until="domcontentloaded", timeout=25000)
+                except Exception:
+                    pass
         try:
             title = (await self.page.title()).lower()
             if any(w in title for w in ("just a moment", "security check", "checking your browser", "attention required")):
@@ -543,10 +643,28 @@ class Browser:
                         await self.page.goto(url, wait_until="domcontentloaded", timeout=20000)
                     except PWTimeout:
                         pass
+                    # Auto-detect and bypass Google bot CAPTCHA (/sorry/index)
+                    if "google.com/sorry" in self.page.url or "sorry/index" in self.page.url:
+                        q_match = re.search(r"[?&]q=([^&]+)", url)
+                        if q_match:
+                            q = q_match.group(1)
+                            is_img = "isch" in url or "tbm=isch" in url
+                            fallback = f"https://www.bing.com/images/search?q={q}" if is_img else f"https://www.bing.com/search?q={q}"
+                            try:
+                                await self.page.goto(fallback, wait_until="domcontentloaded", timeout=20000)
+                            except Exception:
+                                pass
                     try:
                         title = (await self.page.title()).lower()
                         if any(w in title for w in ("just a moment", "security check", "checking your browser", "attention required")):
                             await self.page.wait_for_timeout(2500)
+                        # Dismiss search engine consent banners (Google, Bing) if present
+                        for sel in ("#L2AGLb", "button:has-text('Accept all')", "button:has-text('I agree')", "#bnp_btn_accept"):
+                            loc = self.page.locator(sel).first
+                            if await loc.is_visible(timeout=250):
+                                await loc.click(timeout=800)
+                                await self.page.wait_for_timeout(300)
+                                break
                     except Exception:
                         pass
                     await self._settle()

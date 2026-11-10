@@ -27,12 +27,12 @@ ACKS = ["Sure, one second…", "Checking now…", "जी, एक सेकं�
 
 PORTAL = f"http://localhost:{os.environ.get('PORT', '8000')}/portal"
 
-SYSTEM = f"""You are "Dial-a-Browser": an intelligent phone assistant that browses any website on live voice calls. \
-The caller cannot see a screen. You drive a real web browser for them and talk naturally on the call.
+SYSTEM = f"""You are "Dial-a-Browser": an intelligent voice assistant that browses any website on live calls. \
+The caller can see your live browser screen on their device in real time, and you drive the browser for them while talking naturally.
 
 LANGUAGE:
 - Always reply in the EXACT SAME LANGUAGE the caller speaks.
-- If the caller speaks English, respond in clear, natural English!
+- If the caller speaks English, respond in clear, fluent, natural English!
 - If the caller speaks Hindi, respond in everyday Hindi (in Devanagari script).
 - If the caller speaks Hinglish, respond in Hinglish.
 - If the caller speaks Tamil, Telugu, Kannada, Bengali, Marathi, or any other language, respond in that language.
@@ -41,30 +41,32 @@ LANGUAGE:
 VOICE & TONE:
 - Speak as a friendly, helpful assistant. Keep spoken answers concise (1-3 sentences per turn).
 - Explain and summarize website facts directly and clearly.
-- Never stay silent while browsing: narrate briefly what you are doing (e.g. "Looking up Sydney Sweeney on Wikipedia now…").
+- Never stay silent while browsing: narrate briefly what you are doing (e.g. "Opening Sydney Sweeney pictures on screen now…").
 
 CALL CONTINUITY:
 - NEVER hang up or call end_call on your own.
-- Only call end_call if the caller explicitly says goodbye or asks to end the call (e.g. "bye", "hang up", "call cut kar do", "exit").
+- Only call end_call if the caller explicitly says goodbye or asks to end the call (e.g. "bye", "goodbye", "hang up", "call cut kar do").
 - When answering a question or finishing a task, ALWAYS stay on the line and ask: "Is there anything else you would like me to check?"
 
-WEBSITES & CAPABILITIES:
-- Displaying Images / Photos / Wallpapers: When asked to show or display images, photos, or pictures of ANY person, celebrity, place, animal, or object, open Google Images directly:
-  open_url(url="https://www.google.com/search?tbm=isch&q=<query>", narration="Opening pictures on screen now…")
-  or Bing Images. The caller can see the live screen on their device, which will immediately display the full gallery of images!
-- General Search, Questions & News: When asked for anything not covered by a specialized site, use Google Search:
-  open_url(url="https://www.google.com/search?q=<query>", narration="Searching the web for that…")
-- Sports & Live Cricket: Open `https://www.google.com/search?q=<match+or+team>+live+score` or Cricbuzz.
-- Weather & Forecasts: Open `https://www.google.com/search?q=weather+<city>` or `https://mausam.imd.gov.in/`.
+AUTONOMOUS TASKS & WEBSITES:
+You are an autonomous web-browsing agent. You can accomplish ANY task on the web that the user asks for:
+- Displaying Images / Photos / Wallpapers: When asked to show or display images, photos, or pictures of ANY person, celebrity, place, animal, or object:
+  IMMEDIATELY open Bing Images:
+  open_url(url="https://www.bing.com/images/search?q=<query>", narration="Opening pictures on screen now…")
+  Do NOT open Wikipedia or text pages when images are requested! Open the image gallery directly so the user sees the pictures right on their live screen!
+- General Search, Questions & News: When asked for general queries or facts, use Bing Search:
+  open_url(url="https://www.bing.com/search?q=<query>", narration="Searching the web for that…")
 - Videos & Entertainment: YouTube (`https://www.youtube.com/results?search_query=<query>`), IMDb for movies and cast.
-- Encyclopedic Articles & Biographies: Wikipedia (`https://en.wikipedia.org/wiki/<topic>` or `https://hi.wikipedia.org/wiki/<topic>`).
+- Sports & Live Cricket: Open `https://www.cricbuzz.com/cricket-match/live-scores` or Bing Sports.
+- Weather & Forecasts: Open `https://www.bing.com/search?q=weather+<city>` or `https://mausam.imd.gov.in/`.
+- Encyclopedic Articles & Biographies: Wikipedia (`https://en.wikipedia.org/wiki/<topic>`) - use this ONLY when the user asks for detailed biographical facts, history, or encyclopedia articles, NOT when they ask for images!
 - Indian Railways & Trains:
   - Live train running status / "where is my train" / schedule / platform: NTES `https://enquiry.indianrail.gov.in/mntes/` . On the home page, type the train number into "Train No./Name" with type_and_submit.
   - Trains between two stations: NTES "Trains B/w Stations".
   - Train search and fares: IRCTC `https://www.irctc.co.in/nget/train-search` (search only).
 - Government schemes: `https://www.myscheme.gov.in/search` .
 - Ticket BOOKING walkthrough: use the RailSeva demo portal {PORTAL} and tell the caller once that it is a demo booking.
-- ANY OTHER TASK: You have full access to the live internet. Freely navigate to whichever website best solves the user's request.
+- ANY OTHER TASK: You have full access to the live internet. Autonomously navigate to whichever website best solves the user's request.
 
 SPEED (every LLM round trip costs the caller seconds)
 - Prefer ONE browse call that does the whole flow: e.g. [open url, type "From Station*" = "Bhubaneswar" \
@@ -200,6 +202,13 @@ class Agent:
         said = text.split("  [detected")[0]
         self.recent_user = (self.recent_user + [said])[-4:]
         self.waiting = False
+        m_lang = re.search(r"\[detected language:\s*([a-zA-Z\-_]+)\]", text)
+        if m_lang:
+            self.user_lang = m_lang.group(1).lower()
+        elif any("\u0900" <= c <= "\u097F" for c in said):
+            self.user_lang = "hi"
+        elif not getattr(self, "user_lang", None):
+            self.user_lang = "en"
         g = gnani.caller_gender_from(said)
         if g and g != self.caller_gender:
             self.caller_gender = g
@@ -259,12 +268,18 @@ class Agent:
                 self.messages.append({"role": "user", "content": "(system note) " + " ".join(notes)})
             resp = await self._llm()
             if resp is None:
+                is_en = getattr(self, "user_lang", "en").startswith("en")
                 if getattr(self, "quota_out_until", 0) > time.monotonic():
-                    await self.call.speak("माफ़ कीजिए, अभी मेरा सिस्टम बहुत busy है। "
-                                          "कुछ मिनट बाद फिर से call कीजिए।", "guide")
+                    msg = ("Sorry, my system is very busy right now. Please call again in a few minutes."
+                           if is_en else
+                           "माफ़ कीजिए, अभी मेरा सिस्टम बहुत busy है। कुछ मिनट बाद फिर से call कीजिए।")
+                    await self.call.speak(msg, "guide")
                 else:
                     await self.call.ui({"type": "log", "text": "Groq: no model available for this step"})
-                    await self.call.speak("माफ़ कीजिए, एक सेकंड दिक्कत आ गई। फिर से बोलिए?", "guide")
+                    msg = ("Sorry, I had a brief hiccup. Could you say that again?"
+                           if is_en else
+                           "माफ़ कीजिए, एक सेकंड दिक्कत आ गई। फिर से बोलिए?")
+                    await self.call.speak(msg, "guide")
                 self.waiting = True
                 return
             msg = resp.choices[0].message
@@ -293,7 +308,9 @@ class Agent:
                 stop = stop or done_turn
             if stop:
                 return
-        await self.call.speak("आप बताइए, आगे क्या करना है?", "guide")
+        is_en = getattr(self, "user_lang", "en").startswith("en")
+        prompt_next = "What would you like me to check next?" if is_en else "आप बताइए, आगे क्या करना है?"
+        await self.call.speak(prompt_next, "guide")
         self.waiting = True
 
     def _compact(self) -> list:
@@ -351,7 +368,9 @@ class Agent:
                 return None
             if not said_wait and wait > 1.5:
                 said_wait = True
-                asyncio.create_task(self.call.speak("बस एक सेकंड, देख रही हूँ…", "guide"))
+                is_en = getattr(self, "user_lang", "en").startswith("en")
+                wait_msg = "Just a moment, checking that for you…" if is_en else "बस एक सेकंड, देख रही हूँ…"
+                asyncio.create_task(self.call.speak(wait_msg, "guide"))
             log.info("all models busy; waiting %.1fs", max(wait, 0.5))
             await asyncio.sleep(min(max(wait, 0.5), 10.0))
         return None
@@ -390,8 +409,8 @@ class Agent:
                         "confirm the switch to the caller in one short line."), False
             if name == "end_call":
                 recent_user = " ".join(m.get("content", "") for m in self.messages[-4:] if m.get("role") == "user").lower()
-                hangup_words = ("bye", "goodbye", "hang up", "cut", "band karo", "alvida", "rakho", "rakhta", "exit", "stop", "end call")
-                if any(w in recent_user for w in hangup_words):
+                hangup_pattern = r"\b(bye|goodbye|hang up|call cut|disconnect|call kat do|call band karo|alvida|phone rakh do|end call)\b"
+                if re.search(hangup_pattern, recent_user):
                     self.ended = True
                     await self.call.hangup(after_speech=True)
                     return "call ended", True

@@ -281,6 +281,7 @@ function endCall() {
   $('dial').disabled = false;
   $('end').disabled = true;
   $('last').textContent = 'Call ended.';
+  $('url').textContent = 'Browser idle';
 }
 
 $('dial').onclick = () => startCall().catch(err => { log('error: ' + esc(err.message)); $('dial').disabled = false; });
