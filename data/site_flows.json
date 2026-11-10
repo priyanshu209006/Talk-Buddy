@@ -7,9 +7,100 @@
      "url": "https://enquiry.indianrail.gov.in/mntes/"
     },
     {
+     "do": "click",
+     "target": "Trains B/w Stations"
+    },
+    {
      "do": "type",
-     "target": "Train No./Name",
-     "text": "12309"
+     "target": "From Station*",
+     "text": "Gaya",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    },
+    {
+     "do": "click",
+     "target": "Clear"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Gaya",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "New Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "click",
+     "target": "Clear"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Gaya",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "New Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Gaya",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://enquiry.indianrail.gov.in/mntes/"
+    },
+    {
+     "do": "click",
+     "target": "Trains B/w Stations"
     }
    ]
   },
@@ -26,13 +117,113 @@
     {
      "do": "type",
      "target": "From Station*",
-     "text": "Bhubaneswar",
+     "text": "Roni",
      "pick": true
     },
     {
      "do": "type",
      "target": "To Station*",
-     "text": "Khurda Road",
+     "text": "Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    },
+    {
+     "do": "click",
+     "target": "Clear"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Roni",
+     "enter": false
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Roni",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    },
+    {
+     "do": "click",
+     "target": "Clear"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Roni",
+     "enter": false
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "DLI",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    },
+    {
+     "do": "click",
+     "target": "Clear"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Barauni",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "DLI",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "DLI",
      "pick": true
     },
     {

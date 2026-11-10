@@ -118,10 +118,10 @@ class Call:
         self.notes: list[str] = []
         self.closed = False
         self.barge_in = True             # duplex on: caller can talk over the assistant
-        self.user_talking = False
+        self._user_talking = False
+        self._user_talking_until = 0.0
         self._verified: dict[int, float | None] = {}
-        self.listener = duplex.Listener()
-        self.recent_said: list[str] = []  # last few things the assistant said (echo check)
+        self.recent_said: list[str] = []  # last few things the assistant said
         self.ducked = False
         self._unduck_at = 0.0
         self.guide_voice = gnani.VOICES["guide"]["voice"]   # can be switched by the caller
@@ -176,6 +176,17 @@ class Call:
     @property
     def is_speaking(self) -> bool:
         return self.current is not None or time.monotonic() < self.speaking_until
+
+    @property
+    def user_talking(self) -> bool:
+        if self._user_talking and time.monotonic() > self._user_talking_until:
+            self._user_talking = False
+        return self._user_talking
+
+    @user_talking.setter
+    def user_talking(self, val: bool):
+        self._user_talking = val
+        self._user_talking_until = time.monotonic() + 2.5 if val else 0.0
 
     async def _speaker(self):
         while not self.closed:
@@ -255,31 +266,30 @@ class Call:
                 return
             lang = msg.get("detected_language_code")
             speaking = self.is_speaking
-            verdict, why = await self.listener.classify(
-                text,
-                assistant_speaking=speaking,
-                speaking_text=gnani.strip_tags(self.current[0]) if self.current else "",
-                recent_said=" ".join(self.recent_said),
-                last_question=self.agent.last_question,
-                waiting=self.agent.waiting,
-                task=" | ".join(self.agent.recent_user[-2:]),
-            )
-            log.info("heard [%s] %r lang=%s (%s)", verdict, text, lang, why)
-            self.transcripts.append({"t": round(time.monotonic(), 2), "text": text, "lang": lang,
-                                     "verdict": verdict, "why": why, "latency": msg.get("latency")})
-            relevant = verdict == duplex.RELEVANT
-            await self.ui({"type": "heard", "text": text, "lang": lang, "latency": msg.get("latency"),
-                           "ignored": None if relevant else verdict, "why": why})
-            if not relevant:
-                self._duck(False)            # back to normal volume, carry on
+
+            # Fast backchannel check: if assistant is speaking and caller just acknowledges ("हम्म/ok"), don't barge in
+            words = [w.lower() for w in re.findall(r"[\wऀ-෿]+", text)]
+            if speaking and words and all(w in duplex._BACKCHANNEL for w in words):
+                self._duck(False)
+                log.info("backchannel while speaking ignored: %r", text)
+                await self.ui({"type": "heard", "text": text, "lang": lang, "latency": msg.get("latency"),
+                               "ignored": "backchannel", "why": "acknowledgement while assistant speaking"})
                 return
+
             if speaking and self.barge_in:
                 self._barge_in()
             else:
                 self._duck(False)
-            # Instant acknowledgement for a real request (not for short answers like "हाँ"):
+
+            log.info("heard %r lang=%s (latency=%sms)", text, lang, msg.get("latency"))
+            self.transcripts.append({"t": round(time.monotonic(), 2), "text": text, "lang": lang,
+                                     "verdict": "RELEVANT", "why": "direct", "latency": msg.get("latency")})
+            await self.ui({"type": "heard", "text": text, "lang": lang, "latency": msg.get("latency"),
+                           "ignored": None, "why": ""})
+
+            # Instant acknowledgement for a multi-word request:
             # cached audio, plays within ~100 ms while the agent thinks and browses.
-            if len(text.split()) >= 4:
+            if len(text.split()) >= 3:
                 asyncio.create_task(self.speak(random.choice(ACKS), "guide"))
             self.agent.hear(f"{text}" + (f"  [detected language: {lang}]" if lang else ""))
         elif t == "error":

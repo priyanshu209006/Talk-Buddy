@@ -255,11 +255,11 @@ class Agent:
         while not self.ended:
             text = await self.inbox.get()
             self.messages.append({"role": "user", "content": text})
-            # Prisma closes a segment at each pause; wait briefly so we answer the whole utterance.
-            for _ in range(40):
-                await asyncio.sleep(0.2)
+            # Brief debounce (up to ~0.6s) to coalesce closely-spaced transcript segments
+            for _ in range(3):
                 if not self.call.user_talking and self.inbox.empty():
                     break
+                await asyncio.sleep(0.2)
                 self._drain()
             self._drain()
             await self._turn()
@@ -279,6 +279,7 @@ class Agent:
                 else:
                     await self.call.ui({"type": "log", "text": "Groq: no model available for this step"})
                     await self.call.speak("माफ़ कीजिए, एक सेकंड दिक्कत आ गई। फिर से बोलिए?", "guide")
+                self.waiting = True
                 return
             msg = resp.choices[0].message
             calls = msg.tool_calls or []
@@ -307,6 +308,7 @@ class Agent:
             if stop:
                 return
         await self.call.speak("आप बताइए, आगे क्या करना है?", "guide")
+        self.waiting = True
 
     def _compact(self) -> list:
         """Only the newest page snapshot is sent in full; older ones shrink to their URL line."""
