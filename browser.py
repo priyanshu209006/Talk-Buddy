@@ -13,6 +13,103 @@ log = logging.getLogger("browser")
 
 # Walk the DOM, tag every visible interactive element with a short id the LLM can
 # refer to, and return a compact text rendering of what a sighted user would see.
+STEALTH_JS = r"""
+(() => {
+  try {
+    delete Object.getPrototypeOf(navigator).webdriver;
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => undefined,
+      configurable: true,
+    });
+  } catch (e) {}
+
+  try {
+    window.chrome = {
+      app: {
+        isInstalled: false,
+        InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+        RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' },
+      },
+      runtime: {
+        OnInstalledReason: { CHROME_UPDATE: 'chrome_update', INSTALL: 'install', SHARED_MODULE_UPDATE: 'shared_module_update', UPDATE: 'update' },
+        OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update', PERIODIC: 'periodic' },
+        PlatformArch: { ARM: 'arm', ARM64: 'arm64', MIPS: 'mips', MIPS64: 'mips64', X86_32: 'x86-32', X86_64: 'x86-64' },
+        PlatformNaclArch: { ARM: 'arm', MIPS: 'mips', MIPS64: 'mips64', X86_32: 'x86-32', X86_64: 'x86-64' },
+        PlatformOs: { ANDROID: 'android', CROS: 'cros', LINUX: 'linux', MAC: 'mac', OPENBSD: 'openbsd', WIN: 'win' },
+        RequestUpdateCheckStatus: { NO_UPDATE: 'no_update', THROTTLED: 'throttled', UPDATE_AVAILABLE: 'update_available' },
+      },
+      loadTimes: function() {},
+      csi: function() {},
+    };
+  } catch (e) {}
+
+  try {
+    const fakePlugins = [
+      { name: 'PDF Viewer', filename: 'pdf-viewer', description: 'Portable Document Format' },
+      { name: 'Chrome PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+      { name: 'Chromium PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+      { name: 'Microsoft Edge PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+      { name: 'WebKit built-in PDF', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+    ];
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => fakePlugins,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'mimeTypes', {
+      get: () => [
+        { type: 'application/pdf', suffixes: 'pdf', description: 'Portable Document Format', enabledPlugin: fakePlugins[0] }
+      ],
+      configurable: true,
+    });
+  } catch (e) {}
+
+  try {
+    Object.defineProperty(navigator, 'languages', {
+      get: () => ['en-IN', 'en-GB', 'en-US', 'en', 'hi'],
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'platform', {
+      get: () => 'Win32',
+      configurable: true,
+    });
+  } catch (e) {}
+
+  try {
+    const origQuery = window.navigator.permissions && window.navigator.permissions.query;
+    if (origQuery) {
+      window.navigator.permissions.query = (params) => (
+        params && params.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : origQuery(params)
+      );
+    }
+  } catch (e) {}
+
+  try {
+    const spoofGL = (proto) => {
+      if (!proto) return;
+      const orig = proto.getParameter;
+      proto.getParameter = function(param) {
+        if (param === 37445) return 'Google Inc. (Intel)';
+        if (param === 37446) return 'ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+        return orig.apply(this, [param]);
+      };
+    };
+    if (typeof WebGLRenderingContext !== 'undefined') spoofGL(WebGLRenderingContext.prototype);
+    if (typeof WebGL2RenderingContext !== 'undefined') spoofGL(WebGL2RenderingContext.prototype);
+  } catch (e) {}
+
+  try {
+    if (window.outerWidth === 0) {
+      Object.defineProperty(window, 'outerWidth', { get: () => window.innerWidth });
+    }
+    if (window.outerHeight === 0) {
+      Object.defineProperty(window, 'outerHeight', { get: () => window.innerHeight + 85 });
+    }
+  } catch (e) {}
+})();
+"""
+
 SNAPSHOT_JS = r"""
 () => {
   const vis = el => {
@@ -111,15 +208,33 @@ async def shared_browser():
         # Headless is the stable default. HEADLESS=0 runs a real window parked off-screen,
         # which IRCTC accepts, but on this machine Edge sometimes closed that window by itself.
         headless = os.environ.get("HEADLESS", "1") != "0"
-        args = ["--no-sandbox", "--disable-dev-shm-usage"]
+        args = [
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-features=IsolateOrigins,site-per-process",
+            "--disable-infobars",
+            "--no-first-run",
+            "--no-service-autorun",
+            "--password-store=basic",
+        ]
         if not headless:
-            args.extend(["--window-position=-32000,-32000", "--window-size=1100,860"])
+            args.extend(["--window-position=-32000,-32000", "--window-size=1280,800"])
         channel = os.environ.get("BROWSER_CHANNEL") or None
+        ignore_default_args = ["--enable-automation"]
         try:
-            b = await pw.chromium.launch(headless=headless, channel=channel, args=args)
+            b = await pw.chromium.launch(
+                headless=headless,
+                channel=channel,
+                args=args,
+                ignore_default_args=ignore_default_args,
+            )
         except Exception as e:
-            log.warning("Chromium launch failed (%s); trying msedge", str(e).splitlines()[0])
-            b = await pw.chromium.launch(headless=headless, channel="msedge", args=args)
+            log.warning("Chromium launch failed (%s); trying fallback args", str(e).splitlines()[0])
+            b = await pw.chromium.launch(
+                headless=headless,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+            )
         _SHARED["browser"] = b
         return b
 
@@ -147,11 +262,38 @@ class Browser:
         # One browser process for the whole server (launched at startup, ~3 s saved per call);
         # each call gets its own isolated context.
         self._browser = await shared_browser()
+        user_agent = os.environ.get(
+            "BROWSER_USER_AGENT",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        )
+        proxy_url = os.environ.get("PROXY_URL") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+        proxy = {"server": proxy_url} if proxy_url else None
+
         self._ctx = await self._browser.new_context(
-            viewport={"width": 1100, "height": 760},
+            viewport={"width": 1280, "height": 800},
+            user_agent=user_agent,
             locale="en-IN",
             timezone_id="Asia/Kolkata",
+            color_scheme="light",
+            device_scale_factor=1,
+            has_touch=False,
+            is_mobile=False,
+            java_script_enabled=True,
+            proxy=proxy,
+            extra_http_headers={
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7,hi;q=0.6",
+                "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"Windows"',
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+            },
         )
+        await self._ctx.add_init_script(STEALTH_JS)
         self.page = await self._ctx.new_page()
 
     def alive(self) -> bool:
@@ -239,6 +381,12 @@ class Browser:
         try:
             await self.page.goto(url, wait_until="domcontentloaded", timeout=25000)
         except PWTimeout:
+            pass
+        try:
+            title = (await self.page.title()).lower()
+            if any(w in title for w in ("just a moment", "security check", "checking your browser", "attention required")):
+                await self.page.wait_for_timeout(2500)
+        except Exception:
             pass
         await self._settle()
         return await self.snapshot()

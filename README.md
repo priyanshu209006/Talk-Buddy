@@ -116,6 +116,7 @@ GUIDE_VOICE=Shivani      # SITE_VOICE=Avinash
 STT_LANGS=hi-IN          # one locale or indic-auto
 PHONE_MODE=0             # 1 = simulate an 8 kHz phone line
 HEADLESS=1               # 0 = real window off-screen (IRCTC accepts it)
+PROXY_URL=               # optional: http://user:pass@host:port (e.g. Indian proxy for geo-blocked sites)
 ```
 `.env` is re-read on every call, so rotated keys apply without a restart.
 

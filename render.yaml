@@ -15,3 +15,5 @@ services:
         sync: false
       - key: HEADLESS
         value: "1"
+      - key: PROXY_URL
+        sync: false
