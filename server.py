@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).with_name(".env"))
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect  # noqa: E402
-from fastapi.responses import FileResponse, RedirectResponse  # noqa: E402
+from fastapi.responses import FileResponse, RedirectResponse, Response  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 import duplex  # noqa: E402
@@ -94,12 +94,18 @@ async def root():
     return RedirectResponse("/phone")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(content=b"", media_type="image/x-icon", status_code=204)
+
+
 @app.get("/config")
 async def config():
     return {"stt_rate": gnani.STT_RATE, "tts_rate": gnani.TTS_RATE, "phone_mode": gnani.PHONE_MODE}
 
 
 @app.get("/phone")
+@app.get("/phone/")
 async def phone():
     return FileResponse(STATIC / "phone.html", headers={"Cache-Control": "no-store"})
 
