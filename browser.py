@@ -459,7 +459,8 @@ class Browser:
 
     async def screenshot_b64(self) -> str | None:
         try:
-            png = await self.page.screenshot(type="jpeg", quality=55, timeout=8000)
+            q = int(os.environ.get("SCREEN_QUALITY", "85"))
+            png = await self.page.screenshot(type="jpeg", quality=q, timeout=8000)
             return base64.b64encode(png).decode()
         except Exception:
             return None

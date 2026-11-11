@@ -108,7 +108,7 @@
 <script>
 const $ = id => document.getElementById(id);
 let ws, ctx, micCtx, micStream, worklet, outGain, playHead = 0, sources = [], t0 = 0, timerId, lastSay = null;
-let sttRate = 16000, ttsRate = 24000;
+let sttRate = 16000, ttsRate = 48000;
 
 function addMsg(kind, label, text) {
   const d = document.createElement('div');
@@ -220,6 +220,10 @@ async function startCall() {
       case 'say':
         lastSay = addMsg('guide', 'Assistant', m.text);
         $('last').textContent = m.text;
+        break;
+      case 'config':
+        if (m.stt_rate) sttRate = m.stt_rate;
+        if (m.tts_rate) ttsRate = m.tts_rate;
         break;
       case 'pong':
         break;

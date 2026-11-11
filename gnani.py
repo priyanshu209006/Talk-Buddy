@@ -13,12 +13,13 @@ log = logging.getLogger("gnani")
 STT_URL = "wss://api.vachana.ai/stt/v3/stream"
 TTS_URL = "wss://api.vachana.ai/api/v1/tts"
 
-# PHONE_MODE=1 simulates a real narrowband phone line (8 kHz both ways). Default is a
-# wideband call: 16 kHz into Prisma (much better accuracy from a laptop mic) and 24 kHz
-# out of Timbre (far more natural than 8 kHz on speakers/headphones).
+# PHONE_MODE=1 simulates a real narrowband phone line (8 kHz both ways). Default is the
+# highest-quality wideband call: 16 kHz native wideband into Prisma (optimal accuracy without
+# 3x WebSocket frame overhead on 0.1 vCPU) and studio 48 kHz out of Timbre (matching native
+# browser AudioContext playback). Override individually with STT_RATE / TTS_RATE if needed.
 PHONE_MODE = os.environ.get("PHONE_MODE", "0") == "1"
-STT_RATE = 8000 if PHONE_MODE else 16000
-TTS_RATE = 8000 if PHONE_MODE else 24000
+STT_RATE = int(os.environ.get("STT_RATE", "8000" if PHONE_MODE else "16000"))
+TTS_RATE = int(os.environ.get("TTS_RATE", "8000" if PHONE_MODE else "48000"))
 SAMPLE_RATE = STT_RATE      # back-compat name
 FRAME_BYTES = 1024          # Prisma expects 1024-byte PCM frames
 
