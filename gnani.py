@@ -96,7 +96,13 @@ class PrismaStream:
         for task in (self._reader, self._dispatcher):   # avoid duplicates on reconnect
             if task:
                 task.cancel()
-        self.ws = await websockets.connect(STT_URL, additional_headers=headers, max_size=None)
+        self.ws = await websockets.connect(
+            STT_URL,
+            additional_headers=headers,
+            max_size=None,
+            ping_interval=25,
+            ping_timeout=60,
+        )
         self._reader = asyncio.create_task(self._read())
         self._dispatcher = asyncio.create_task(self._dispatch())
 

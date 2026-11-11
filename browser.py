@@ -4,12 +4,14 @@ import logging
 import os
 import re
 import time
+from urllib.parse import quote_plus, unquote_plus
 
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 
 import adapters
 
 log = logging.getLogger("browser")
+os.environ.setdefault("NODE_OPTIONS", "--max-old-space-size=64")
 
 # Walk the DOM, tag every visible interactive element with a short id the LLM can
 # refer to, and return a compact text rendering of what a sighted user would see.
@@ -212,16 +214,23 @@ async def shared_browser():
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--disable-blink-features=AutomationControlled",
-            "--disable-features=IsolateOrigins,site-per-process",
+            "--disable-features=IsolateOrigins,site-per-process,Translate,BackForwardCache",
             "--disable-infobars",
             "--no-first-run",
             "--no-service-autorun",
             "--password-store=basic",
             "--disable-gpu",
             "--disable-software-rasterizer",
+            "--disable-accelerated-2d-canvas",
             "--renderer-process-limit=1",
             "--no-zygote",
-            "--js-flags=--max-old-space-size=128",
+            "--js-flags=--max-old-space-size=64",
+            "--disk-cache-size=1",
+            "--media-cache-size=1",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-default-apps",
+            "--disable-sync",
             "--mute-audio",
         ]
         if not headless:
@@ -290,9 +299,13 @@ class Browser:
                 "Accept-Language": "en-IN,en-US;q=0.9,en;q=0.8,hi;q=0.7",
             },
         )
-        # Block known telemetry and ad networks to save RAM and avoid tracker timeouts
+        # Block telemetry, ads, web fonts, and media streams to stay under Render Free's 512 MB cap
         async def block_trackers(route):
-            u = route.request.url.lower()
+            req = route.request
+            if req.resource_type in ("font", "media"):
+                await route.abort()
+                return
+            u = req.url.lower()
             if any(t in u for t in (
                 "google-analytics.com",
                 "googlesyndication.com",
@@ -446,7 +459,7 @@ class Browser:
 
     async def screenshot_b64(self) -> str | None:
         try:
-            png = await self.page.screenshot(type="jpeg", quality=55, timeout=4000)
+            png = await self.page.screenshot(type="jpeg", quality=55, timeout=8000)
             return base64.b64encode(png).decode()
         except Exception:
             return None
@@ -454,34 +467,100 @@ class Browser:
     def _el(self, element_id: str):
         return self.page.locator(f'[data-dab="{element_id}"]').first
 
-    async def open(self, url: str) -> str:
-        if not url.startswith(("http://", "https://")):
-            url = "https://" + url
+    @staticmethod
+    def _gallery_url(query: str) -> str:
+        port = os.environ.get("PORT", "8000")
+        return f"http://127.0.0.1:{port}/gallery?q={quote_plus(query)}"
 
-        # Reroute all image searches to Yahoo Images (no bot blocks, no SafeSearch censorship, instant full-width photo grid)
-        if "bing.com/images" in url or ("google.com/search" in url and ("tbm=isch" in url or "udm=2" in url)) or ("duckduckgo.com" in url and "iax=images" in url):
-            q_match = re.search(r"[?&][qp]=([^&]+)", url)
+    @classmethod
+    def _rewrite_image_url(cls, url: str) -> str:
+        low = url.lower()
+        port = os.environ.get("PORT", "8000")
+        if re.match(r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?/gallery\b", low):
+            return re.sub(
+                r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?",
+                f"http://127.0.0.1:{port}",
+                url,
+                count=1,
+                flags=re.IGNORECASE,
+            )
+        is_img_search = (
+            "bing.com/images" in low
+            or "images.search.yahoo.com" in low
+            or "search.brave.com/images" in low
+            or ("google.com/search" in low and ("tbm=isch" in low or "udm=2" in low))
+            or ("duckduckgo.com" in low and ("iax=images" in low or "ia=images" in low))
+        )
+        if is_img_search:
+            q_match = re.search(r"[?&](?:q|p)=([^&#]+)", url)
             if q_match:
-                q = q_match.group(1)
-                url = f"https://images.search.yahoo.com/search/images?p={q}"
-                log.info("Rerouted image search to Yahoo Images: %s", url)
+                q = unquote_plus(q_match.group(1)).strip()
+                if q:
+                    rewritten = cls._gallery_url(q)
+                    log.info("Rerouted image search to local gallery: %s", rewritten)
+                    return rewritten
+        return url
 
+    async def _recycle_page(self):
+        """Open a fresh tab and close the old one so renderer heap doesn't climb across navigations."""
+        if not self._ctx or not self.page:
+            return
+        if not (self.page.url or "").startswith(("http://", "https://")):
+            return
+        old = self.page
         try:
-            await self.page.goto(url, wait_until="domcontentloaded", timeout=25000)
+            self.page = await self._ctx.new_page()
+            await old.close()
+        except Exception:
+            if self.page is None or self.page.is_closed():
+                self.page = await self._ctx.new_page()
+
+    async def _wait_images(self, timeout_ms: int = 2000):
+        """Wait briefly for visible <img> tags on gallery pages to finish decoding."""
+        if not self.page:
+            return
+        try:
+            await self.page.evaluate(
+                """(ms) => new Promise((resolve) => {
+                    const deadline = Date.now() + ms;
+                    const check = () => {
+                        const imgs = [...document.querySelectorAll('img')];
+                        if (imgs.every(i => i.complete) || Date.now() >= deadline) return resolve();
+                        setTimeout(check, 80);
+                    };
+                    check();
+                })""",
+                timeout_ms,
+            )
+        except Exception:
+            pass
+
+    async def _goto(self, url: str, timeout: int = 25000):
+        if not url.startswith(("http://", "https://")):
+            scheme = "http://" if url.startswith(("localhost", "127.0.0.1")) else "https://"
+            url = scheme + url
+        url = self._rewrite_image_url(url)
+        await self._recycle_page()
+        try:
+            await self.page.goto(url, wait_until="domcontentloaded", timeout=timeout)
         except PWTimeout:
             pass
-        # Auto-detect and bypass Google bot CAPTCHA (/sorry/index)
         if "google.com/sorry" in self.page.url or "sorry/index" in self.page.url:
-            q_match = re.search(r"[?&]q=([^&]+)", url)
+            q_match = re.search(r"[?&]q=([^&#]+)", url)
             if q_match:
-                q = q_match.group(1)
+                q = unquote_plus(q_match.group(1)).strip()
                 is_img = "isch" in url or "tbm=isch" in url or "udm=2" in url
-                fallback = f"https://images.search.yahoo.com/search/images?p={q}" if is_img else f"https://www.bing.com/search?q={q}"
+                fallback = self._gallery_url(q) if is_img else f"https://www.bing.com/search?q={quote_plus(q)}"
                 log.info("Google CAPTCHA encountered; falling back: %s", fallback)
                 try:
-                    await self.page.goto(fallback, wait_until="domcontentloaded", timeout=25000)
+                    await self.page.goto(fallback, wait_until="domcontentloaded", timeout=timeout)
                 except Exception:
                     pass
+        if "/gallery" in (self.page.url or ""):
+            await self._wait_images(2000)
+
+    async def open(self, url: str) -> str:
+        await self._goto(url, timeout=25000)
         try:
             title = (await self.page.title()).lower()
             if any(w in title for w in ("just a moment", "security check", "checking your browser", "attention required")):
@@ -647,27 +726,7 @@ class Browser:
             do = (st.get("do") or "").lower()
             try:
                 if do == "open":
-                    url = st["url"] if st["url"].startswith("http") else "https://" + st["url"]
-                    if "bing.com/images" in url or ("google.com/search" in url and ("tbm=isch" in url or "udm=2" in url)) or ("duckduckgo.com" in url and "iax=images" in url):
-                        q_match = re.search(r"[?&][qp]=([^&]+)", url)
-                        if q_match:
-                            q = q_match.group(1)
-                            url = f"https://images.search.yahoo.com/search/images?p={q}"
-                    try:
-                        await self.page.goto(url, wait_until="domcontentloaded", timeout=20000)
-                    except PWTimeout:
-                        pass
-                    # Auto-detect and bypass Google bot CAPTCHA (/sorry/index)
-                    if "google.com/sorry" in self.page.url or "sorry/index" in self.page.url:
-                        q_match = re.search(r"[?&]q=([^&]+)", url)
-                        if q_match:
-                            q = q_match.group(1)
-                            is_img = "isch" in url or "tbm=isch" in url or "udm=2" in url
-                            fallback = f"https://images.search.yahoo.com/search/images?p={q}" if is_img else f"https://www.bing.com/search?q={q}"
-                            try:
-                                await self.page.goto(fallback, wait_until="domcontentloaded", timeout=20000)
-                            except Exception:
-                                pass
+                    await self._goto(st["url"], timeout=20000)
                     try:
                         title = (await self.page.title()).lower()
                         if any(w in title for w in ("just a moment", "security check", "checking your browser", "attention required")):

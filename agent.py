@@ -25,7 +25,8 @@ GREETING = "Hello! I am Dial-a-Browser. I can browse any website for you on this
 # Played the instant a real request ends, before any thinking: the line is never silent.
 ACKS = ["Sure, one second…", "Checking now…", "जी, एक सेकंड…", "अच्छा, अभी देखता हूँ…"]
 
-PORTAL = f"http://localhost:{os.environ.get('PORT', '8000')}/portal"
+PORTAL = f"http://127.0.0.1:{os.environ.get('PORT', '8000')}/portal"
+GALLERY = f"http://127.0.0.1:{os.environ.get('PORT', '8000')}/gallery"
 
 SYSTEM = f"""You are "Dial-a-Browser": an intelligent voice assistant that browses any website on live calls. \
 The caller can see your live browser screen on their device in real time, and you drive the browser for them while talking naturally.
@@ -51,9 +52,9 @@ CALL CONTINUITY:
 AUTONOMOUS TASKS & WEBSITES:
 You are an autonomous web-browsing agent. You can accomplish ANY task on the web that the user asks for:
 - Displaying Images / Photos / Wallpapers: When asked to show or display images, photos, or pictures of ANY person, celebrity, place, animal, or object:
-  IMMEDIATELY open Yahoo Images (it renders a rich, high-resolution photo grid of the person on screen with zero censorship or empty boxes):
-  open_url(url="https://images.search.yahoo.com/search/images?p=<query>", narration="Opening pictures on screen now…")
-  Do NOT open Wikipedia and do NOT open Bing Images for photos! Open Yahoo Images directly so the user sees the real pictures right on their live screen!
+  IMMEDIATELY open the fast visual photo gallery using the clean subject name (plus 1-2 helpful keywords if ambiguous):
+  open_url(url="{GALLERY}?q=<query>", narration="Opening pictures on screen now…")
+  Do NOT open Wikipedia, Bing Images, Yahoo Images, Google Images, or Brave Search for photos — always use {GALLERY}?q=<query> so verified photos render reliably on screen!
 - General Search, Questions & News: When asked for general queries or facts, use Bing Search:
   open_url(url="https://www.bing.com/search?q=<query>", narration="Searching the web for that…")
 - Videos & Entertainment: YouTube (`https://www.youtube.com/results?search_query=<query>`), IMDb for movies and cast.
@@ -471,7 +472,13 @@ class Agent:
         else:
             return f"unknown tool {name}", False
         b.last_url = b.page.url
-        asyncio.create_task(self.call.push_screen())      # don't make the caller wait for a screenshot
+        if name == "open_url" or "/gallery" in (b.page.url or ""):
+            try:
+                await asyncio.wait_for(self.call.push_screen(), timeout=3.5)
+            except Exception:
+                pass
+        else:
+            asyncio.create_task(self.call.push_screen())
         # Tell the model what this action changed. Many sites (NTES, myScheme) swap content
         # without changing the URL, and without this the model repeats a click that worked.
         after = {self._label(e) for e in (getattr(b, "last_elements", None) or [])}

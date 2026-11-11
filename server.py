@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 import duplex  # noqa: E402
 import gnani  # noqa: E402
+import gallery  # noqa: E402
 import portal  # noqa: E402
 from agent import ACKS, Agent  # noqa: E402
 import random  # noqa: E402
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Dial-a-Browser", lifespan=lifespan)
+app.include_router(gallery.router)
 app.include_router(portal.router)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
@@ -346,11 +348,12 @@ class Call:
         out = Path(__file__).with_name("logs")
         out.mkdir(exist_ok=True)
         stem = out / time.strftime("call-%Y%m%d-%H%M%S")
-        with wave.open(str(stem) + ".wav", "wb") as w:
-            w.setnchannels(1)
-            w.setsampwidth(2)
-            w.setframerate(gnani.STT_RATE)
-            w.writeframes(bytes(self.recording))
+        if self.recording:
+            with wave.open(str(stem) + ".wav", "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(gnani.STT_RATE)
+                w.writeframes(bytes(self.recording))
         stem.with_suffix(".json").write_text(json.dumps(self.transcripts, ensure_ascii=False, indent=1),
                                              encoding="utf-8")
         log.info("saved %s.wav (%.0fs) and transcripts", stem, len(self.recording) / (gnani.STT_RATE * 2))
@@ -379,11 +382,14 @@ class Call:
                 if m["type"] == "websocket.disconnect":
                     break
                 if m.get("bytes"):
-                    if len(self.recording) < gnani.STT_RATE * 2 * 1800:   # keep up to 30 min
+                    if os.environ.get("SAVE_RECORDINGS") == "1" and len(self.recording) < gnani.STT_RATE * 2 * 1800:
                         self.recording.extend(m["bytes"])
                     await self.stt.send_pcm(m["bytes"])
                 elif m.get("text"):
-                    ctl = json.loads(m["text"])
+                    try:
+                        ctl = json.loads(m["text"])
+                    except json.JSONDecodeError:
+                        continue
                     if ctl.get("type") == "ping":
                         await self.ui({"type": "pong"})
                     elif ctl.get("type") == "barge_in":
@@ -393,24 +399,30 @@ class Call:
         except WebSocketDisconnect:
             pass
         finally:
-            # Flush first: push trailing silence so Prisma finalizes the last utterance, and the
-            # dispatcher (still running) delivers it — so it's logged in the saved recording too.
-            try:
-                await self.stt.flush()
-            except Exception:
-                pass
             self.closed = True
             agent_task.cancel()
             unduck_task.cancel()
             self._speaker_task.cancel()
-            try:
-                self._save_recording()
-            except Exception:
-                log.exception("could not save recording")
             if self._otp_listener in portal.OTP_LISTENERS:
                 portal.OTP_LISTENERS.remove(self._otp_listener)
-            await self.stt.close()
-            await self.browser.close()
+            # Free the Chromium context immediately so quick reconnects never overlap on 512 MB RAM.
+            try:
+                await self.browser.close()
+            except Exception:
+                pass
+            if os.environ.get("SAVE_RECORDINGS") == "1":
+                try:
+                    await self.stt.flush()
+                except Exception:
+                    pass
+                try:
+                    self._save_recording()
+                except Exception:
+                    log.exception("could not save recording")
+            try:
+                await self.stt.close()
+            except Exception:
+                pass
             log.info("call ended")
 
 
@@ -439,4 +451,11 @@ async def call_ws(ws: WebSocket):
 if __name__ == "__main__":
     import uvicorn
     # Local: 127.0.0.1. In Docker/Render: HOST=0.0.0.0 and Render's $PORT.
-    uvicorn.run(app, host=os.environ.get("HOST", "127.0.0.1"), port=int(os.environ.get("PORT", "8000")))
+    uvicorn.run(
+        app,
+        host=os.environ.get("HOST", "127.0.0.1"),
+        port=int(os.environ.get("PORT", "8000")),
+        ws_ping_interval=25.0,
+        ws_ping_timeout=90.0,
+        timeout_keep_alive=75,
+    )
