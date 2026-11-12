@@ -6,18 +6,12 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
     HEADLESS=1 \
-    HOST=0.0.0.0 \
-    PORT=7860 \
-    HOME=/tmp \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    HOST=0.0.0.0
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN mkdir -p /app/data /app/logs && chmod -R a+rX /app && chmod -R 777 /app/data /app/logs
 
-EXPOSE 7860
-
-# Render injects $PORT (overriding 7860); Hugging Face Spaces defaults to 7860.
+# Render injects $PORT; server.py reads it.
 CMD ["python", "-X", "utf8", "server.py"]
