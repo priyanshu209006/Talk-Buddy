@@ -3,195 +3,686 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dial-a-Browser</title>
+<title>Talk Buddy · Live AI Voice Browser</title>
 <style>
-  :root{
-    --bg:#0f1115; --panel:#171a21; --line:#262b36; --text:#e8eaef; --muted:#8a93a6;
-    --guide:#4fd1a5; --site:#f5b74a; --caller:#7aa7ff; --danger:#ff5d5d;
+  :root {
+    --bg: #0b0d12;
+    --panel: #131722;
+    --panel-header: #1a1f2e;
+    --card: #1c2230;
+    --line: #262e40;
+    --text: #e8ecf5;
+    --muted: #8b95a8;
+    --guide: #4fd1a5;
+    --guide-glow: rgba(79, 209, 165, 0.25);
+    --site: #f5b74a;
+    --caller: #5b8cff;
+    --danger: #ff5252;
+    --lcd-bg: #b9c7a3;
+    --lcd-txt: #1c2617;
   }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,Segoe UI,Arial,sans-serif}
-  .wrap{display:grid;grid-template-columns:340px 1fr;gap:20px;max-width:1400px;margin:0 auto;padding:20px 16px}
-  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
-  h1{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
 
-  /* feature phone */
-  .phone{background:linear-gradient(#2b2f38,#1b1e25);border-radius:38px 38px 46px 46px;padding:22px 20px 26px;
-    box-shadow:0 20px 50px #0008, inset 0 1px 0 #ffffff14;width:300px;margin:0 auto}
-  .speaker{width:70px;height:6px;border-radius:3px;background:#0b0c0f;margin:0 auto 14px}
-  .lcd{background:#b9c7a3;color:#1d2618;border-radius:8px;height:230px;padding:10px 12px;font-family:"Courier New",monospace;
-    box-shadow:inset 0 2px 6px #0006;display:flex;flex-direction:column;overflow:hidden}
-  .lcd .top{display:flex;justify-content:space-between;font-size:12px;border-bottom:1px solid #1d261833;padding-bottom:4px}
-  .lcd .who{font-weight:bold;font-size:16px;margin:8px 0 4px}
-  .lcd .last{font-size:12.5px;flex:1;overflow:hidden;white-space:pre-wrap}
-  .lcd .sms{background:#1d2618;color:#b9c7a3;padding:6px 8px;border-radius:4px;font-size:12px;margin-top:6px;display:none}
-  .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:18px}
-  .keys button{background:#3a3f4b;color:#dfe3ea;border:0;border-radius:14px;height:38px;font-size:16px;cursor:default}
-  .callrow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
-  .callrow button{border:0;border-radius:18px;height:44px;font-size:15px;font-weight:600;cursor:pointer;color:#fff}
-  #dial{background:#22a35a} #end{background:var(--danger)} button:disabled{opacity:.35;cursor:not-allowed}
-  .opts{margin-top:14px;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
-  .opts input[type=text]{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:7px;border-radius:6px}
-  .meter{height:4px;background:#0b0c0f;border-radius:2px;margin-top:10px;overflow:hidden}
-  .meter i{display:block;height:100%;width:0;background:var(--guide);transition:width .08s}
+  /* Header */
+  header.app-header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: 0.04em; }
+  .brand-badge { background: linear-gradient(135deg, #4fd1a5, #22a35a); color: #0b0d12; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 800; }
+  .header-badges { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); }
+  .pill { background: var(--card); border: 1px solid var(--line); padding: 3px 10px; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; }
+  .pill.live { border-color: var(--guide); color: var(--guide); }
+  .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+  .pulse-dot.on { background: var(--guide); box-shadow: 0 0 10px var(--guide); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.15); } }
 
-  /* behind the call */
-  .stage{display:grid;grid-template-rows:auto 1fr;gap:16px;min-width:0}
-  .screen{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-  .bar{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12.5px}
-  .bar .dot{width:9px;height:9px;border-radius:50%;background:#444;transition:background .2s,box-shadow .2s}
-  .bar .dot.live{background:#4fd1a5;box-shadow:0 0 8px #4fd1a5}
-  .bar .url{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#0d0f13;padding:4px 8px;border-radius:5px}
-  .bar button{background:#232834;border:1px solid var(--line);color:var(--text);padding:3px 9px;border-radius:5px;font-size:12px;cursor:pointer}
-  .bar button.muted{opacity:.55;color:var(--muted)}
-  #shot{display:block;width:100%;aspect-ratio:1280/800;object-fit:contain;background:#0d0f13;color:transparent;cursor:pointer}
-  #shot:not([src]){visibility:hidden}
-  .cols{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;min-height:0}
-  @media(max-width:1100px){.cols{grid-template-columns:1fr}}
-  .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:420px}
-  .msg{margin:0 0 10px;padding:8px 10px;border-radius:8px;border-left:3px solid;background:#1d212a}
-  .msg small{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
-  .msg.guide{border-color:var(--guide)} .msg.guide small{color:var(--guide)}
-  .msg.site{border-color:var(--site);font-family:Consolas,monospace} .msg.site small{color:var(--site)}
-  .msg.caller{border-color:var(--caller)} .msg.caller small{color:var(--caller)}
-  .msg.cut{opacity:.55;text-decoration:line-through}
-  .msg.ignored{opacity:.45;font-style:italic;border-left-style:dashed}
-  .log{font-family:Consolas,monospace;font-size:12px;color:var(--muted)}
-  .log div{padding:3px 0;border-bottom:1px dashed var(--line)}
-  .log b{color:var(--text)}
-  .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-bottom:8px}
-  .legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+  /* App Layout */
+  .wrap {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 18px;
+    max-width: 1540px;
+    margin: 0 auto;
+    padding: 16px 18px;
+  }
+  @media(max-width: 980px) { .wrap { grid-template-columns: 1fr; } }
+
+  /* Phone Simulator Section */
+  .phone-sec { display: flex; flex-direction: column; gap: 12px; }
+  .phone {
+    background: linear-gradient(165deg, #2c3240, #141720);
+    border: 1px solid #3d465c;
+    border-radius: 36px;
+    padding: 20px 18px 24px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.15);
+    width: 100%;
+    max-width: 310px;
+    margin: 0 auto;
+  }
+  .speaker-slit { width: 64px; height: 5px; border-radius: 3px; background: #0c0e14; margin: 0 auto 12px; border: 1px solid #363d50; }
+  
+  /* Retro-Modern LCD Screen */
+  .lcd {
+    background: var(--lcd-bg);
+    color: var(--lcd-txt);
+    border-radius: 10px;
+    height: 240px;
+    padding: 10px 12px;
+    font-family: "Courier New", Courier, monospace;
+    box-shadow: inset 0 3px 8px rgba(0,0,0,0.45), 0 1px 2px rgba(255,255,255,0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  .lcd .top { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; border-bottom: 1px solid rgba(28, 38, 23, 0.25); padding-bottom: 4px; }
+  .lcd .who { font-weight: 900; font-size: 15px; margin: 6px 0 2px; }
+  .lcd .speech-box { flex: 1; overflow-y: auto; font-size: 12.5px; line-height: 1.35; white-space: pre-wrap; margin-top: 4px; word-break: break-word; }
+  
+  /* Animated LCD sound wave bars */
+  .lcd-waves { display: flex; gap: 3px; align-items: flex-end; height: 16px; margin: 4px 0; }
+  .lcd-waves span { display: block; width: 4px; background: var(--lcd-txt); border-radius: 1px; height: 3px; transition: height 0.08s; }
+
+  /* Dialed digits row */
+  .lcd .digits { font-size: 14px; font-weight: bold; color: #1c2617; letter-spacing: 2px; min-height: 18px; margin-top: 2px; }
+  
+  /* SMS card inside LCD */
+  .lcd .sms {
+    background: #1c2617;
+    color: #b9c7a3;
+    padding: 6px 8px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    margin-top: 6px;
+    display: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+
+  /* Mic Sound Meter */
+  .meter-box { margin-top: 10px; }
+  .meter { height: 5px; background: #0c0e14; border-radius: 3px; overflow: hidden; border: 1px solid #293040; }
+  .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #4fd1a5, #f5b74a, #ff5252); transition: width 0.08s; }
+
+  /* Call Actions */
+  .callrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .callrow button {
+    border: 0;
+    border-radius: 18px;
+    height: 44px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    color: #fff;
+    transition: transform 0.1s, box-shadow 0.2s, opacity 0.2s;
+  }
+  .callrow button:active { transform: scale(0.97); }
+  #dial { background: linear-gradient(135deg, #22a35a, #197a43); box-shadow: 0 4px 14px rgba(34,163,90,0.35); }
+  #end { background: linear-gradient(135deg, #e53935, #b71c1c); box-shadow: 0 4px 14px rgba(229,57,53,0.35); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none !important; }
+
+  /* Interactive Keypad */
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+  .keys button {
+    background: linear-gradient(145deg, #384052, #292f3d);
+    color: #e8ecf5;
+    border: 1px solid #434c62;
+    border-radius: 12px;
+    height: 38px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.1s, transform 0.1s;
+    user-select: none;
+  }
+  .keys button:hover { background: #454f66; }
+  .keys button:active { transform: scale(0.94); background: var(--guide); color: #0b0d12; }
+
+  /* Quick action buttons on phone */
+  .quick-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .quick-bar button {
+    background: #1d222e;
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .quick-bar button:hover { border-color: var(--guide); color: var(--guide); }
+
+  /* Autonomous Consent Card */
+  .consent-card {
+    background: linear-gradient(135deg, #1f2736, #141a24);
+    border: 1px solid var(--guide);
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 10px var(--guide-glow);
+    display: none;
+    animation: fadeIn 0.25s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  .consent-title { font-weight: 700; font-size: 12.5px; color: var(--guide); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .consent-desc { font-size: 12px; color: var(--text); margin-bottom: 10px; line-height: 1.4; }
+  .consent-btns { display: flex; gap: 8px; }
+  .consent-btns button {
+    flex: 1;
+    border: 0;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-allow { background: var(--guide); color: #0b0d12; }
+  .btn-deny { background: #2b3240; color: var(--text); }
+
+  /* Browser Stage */
+  .stage { display: grid; grid-template-rows: auto 1fr; gap: 14px; min-width: 0; }
+  .browser-screen {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Browser Nav Header */
+  .browser-bar {
+    background: var(--panel-header);
+    border-bottom: 1px solid var(--line);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+  }
+  .nav-group { display: flex; gap: 4px; }
+  .nav-btn {
+    background: var(--card);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .nav-btn:hover { border-color: var(--muted); }
+  .url-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: #0c0e14;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 2px 8px;
+    gap: 6px;
+    min-width: 0;
+  }
+  .url-icon { opacity: 0.6; font-size: 11px; }
+  #urlInput {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    font: 12px/1.4 system-ui, sans-serif;
+    outline: none;
+    min-width: 0;
+  }
+  .url-go-btn {
+    background: transparent;
+    border: 0;
+    color: var(--guide);
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+  .bar-tools { display: flex; align-items: center; gap: 8px; }
+  .tool-btn {
+    background: var(--card);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 11.5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .tool-btn.active { border-color: var(--guide); color: var(--guide); }
+  .tool-btn.muted { opacity: 0.55; color: var(--muted); }
+
+  /* Viewport Image Area */
+  .viewport-wrap {
+    position: relative;
+    background: #08090d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 440px;
+    overflow: hidden;
+  }
+  #shot {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: contain;
+    background: #08090d;
+    color: transparent;
+    cursor: crosshair;
+  }
+  #shot:not([src]) { visibility: hidden; }
+
+  /* Ripple click effect */
+  .click-ripple {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(79, 209, 165, 0.45);
+    border: 2px solid #4fd1a5;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0.5);
+    animation: ripple 0.4s ease-out forwards;
+    z-index: 10;
+  }
+  @keyframes ripple {
+    to { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+  }
+
+  /* Fullscreen Viewport Mode */
+  .stage.fullscreen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 9999;
+    background: #000;
+    padding: 10px;
+  }
+  .stage.fullscreen .browser-screen { height: 100%; border-radius: 0; }
+  .stage.fullscreen .viewport-wrap { flex: 1; min-height: 0; }
+  .stage.fullscreen #shot { aspect-ratio: auto; height: 100%; }
+
+  /* Lower Dual Workspace */
+  .cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; min-height: 0; }
+  @media(max-width: 1050px) { .cols { grid-template-columns: 1fr; } }
+  .box {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    overflow-y: auto;
+    max-height: 380px;
+    display: flex;
+    flex-direction: column;
+  }
+  .box-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; display: flex; justify-content: space-between; }
+
+  /* Conversation Messages */
+  .msg {
+    margin: 0 0 9px;
+    padding: 9px 12px;
+    border-radius: 9px;
+    border-left: 3px solid;
+    background: #171c26;
+    animation: fadeIn 0.2s ease;
+  }
+  .msg-head { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; }
+  .msg.guide { border-color: var(--guide); }
+  .msg.guide .msg-author { color: var(--guide); font-weight: 700; }
+  .msg.caller { border-color: var(--caller); }
+  .msg.caller .msg-author { color: var(--caller); font-weight: 700; }
+  .msg.site { border-color: var(--site); font-family: Consolas, monospace; }
+  .msg.cut { opacity: 0.55; text-decoration: line-through; }
+  .msg.ignored { opacity: 0.45; font-style: italic; border-left-style: dashed; }
+
+  /* Activity Log */
+  .log-entry { font-family: Consolas, Monaco, monospace; font-size: 11.5px; padding: 4px 0; border-bottom: 1px dashed var(--line); color: var(--muted); word-break: break-word; }
+  .log-entry b { color: var(--text); }
+  .action-badge {
+    background: #1f2738;
+    color: var(--site);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-right: 6px;
+  }
 </style>
 </head>
 <body>
+
+<header class="app-header">
+  <div class="brand">
+    <span>🌐 Talk Buddy</span>
+    <span class="brand-badge">AI BROWSER 2.0</span>
+  </div>
+  <div class="header-badges">
+    <span class="pill" id="ratePill">🎙️ HD 48 kHz / 16 kHz</span>
+    <span class="pill" id="statusPill"><i class="pulse-dot" id="headerDot"></i> <span id="statusTxt">Ready to Call</span></span>
+  </div>
+</header>
+
 <div class="wrap">
-  <section>
-    <h1>The caller's phone</h1>
+  <!-- Left Column: The Phone -->
+  <section class="phone-sec">
     <div class="phone">
-      <div class="speaker"></div>
+      <div class="speaker-slit"></div>
       <div class="lcd">
-        <div class="top"><span id="sig">▂▄▆ 2G</span><span id="timer">00:00</span></div>
+        <div class="top">
+          <span id="sig">▂▄▆ 5G</span>
+          <span id="volte">VoLTE HD</span>
+          <span id="timer">00:00</span>
+        </div>
         <div class="who" id="who">Dial-a-Browser</div>
-        <div class="last" id="last">Press green to call.</div>
+        <div class="lcd-waves" id="lcdWaves">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="digits" id="digits"></div>
+        <div class="speech-box" id="last">Press green to start call.</div>
         <div class="sms" id="sms"></div>
       </div>
-      <div class="meter"><i id="lvl"></i></div>
+
+      <div class="meter-box">
+        <div class="meter"><i id="lvl"></i></div>
+      </div>
+
       <div class="callrow">
         <button id="dial">📞 Call</button>
         <button id="end" disabled>End</button>
       </div>
+
       <div class="keys">
-        <button>1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>6</button>
-        <button>7</button><button>8</button><button>9</button><button>*</button><button>0</button><button>#</button>
+        <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
+        <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
+        <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
+        <button data-key="*">*</button><button data-key="0">0</button><button data-key="#">#</button>
+      </div>
+
+      <div class="quick-bar">
+        <button id="quickLoginBtn" title="Instruct agent to handle login on the active page">🔑 Ask to Log In</button>
+        <button id="quickSkipAdBtn" title="Autonomously click Skip Ad on video">⏭️ Skip Ad</button>
       </div>
     </div>
-    <div class="opts">
-      <label><input type="checkbox" id="barge" checked> Duplex: talk over the assistant; side talk is ignored (headphones recommended)</label>
-      <input type="text" id="typed" placeholder="(debug) type what the caller says and press Enter">
+
+    <!-- Autonomy / Consent Action Card -->
+    <div class="consent-card" id="consentCard">
+      <div class="consent-title"><span>🛡️</span> <span id="consentTitle">Action Requires Permission</span></div>
+      <div class="consent-desc" id="consentDesc">Website is asking to sign in. Allow Talk Buddy to log in for you?</div>
+      <div class="consent-btns">
+        <button class="btn-allow" id="consentAllowBtn">✅ Yes, Log In</button>
+        <button class="btn-deny" id="consentDenyBtn">❌ Continue</button>
+      </div>
+    </div>
+
+    <div style="background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:8px;">
+      <label style="display:flex; align-items:center; gap:6px;">
+        <input type="checkbox" id="barge" checked> Duplex voice (barge-in enabled)
+      </label>
+      <input type="text" id="typed" placeholder="(debug) type message & press Enter" style="width:100%; background:#0c0e14; border:1px solid var(--line); color:var(--text); padding:6px; border-radius:5px; font-size:12px;">
     </div>
   </section>
 
-  <section class="stage">
-    <div class="screen">
-      <div class="bar"><span class="dot" id="liveDot"></span><span class="url" id="url">Browser idle</span><span id="liveTxt">Agent's browser (live)</span><button id="pageAudioBtn" title="Toggle audio from browser video/audio elements">🔊 Page Audio</button></div>
-      <img id="shot" alt="Live view of the agent's browser">
-    </div>
-    <div class="cols">
-      <div class="box" id="convo">
-        <div class="legend">
-          <span style="--c:var(--caller)">Caller</span>
-          <span style="--c:var(--guide)">Assistant</span>
+  <!-- Right Column: Live Browser Viewport & Activity -->
+  <section class="stage" id="stage">
+    <div class="browser-screen">
+      <div class="browser-bar">
+        <div class="nav-group">
+          <button class="nav-btn" id="navBack" title="Back">◀</button>
+          <button class="nav-btn" id="navFwd" title="Forward">▶</button>
+          <button class="nav-btn" id="navReload" title="Reload">⟳</button>
+        </div>
+        <div class="url-wrap">
+          <span class="url-icon">🔒</span>
+          <input type="text" id="urlInput" value="Browser idle" placeholder="Enter URL or search...">
+          <button class="url-go-btn" id="urlGo">Go ➔</button>
+        </div>
+        <div class="bar-tools">
+          <button class="tool-btn" id="pageAudioBtn" title="Toggle and unmute video/page audio">🔊 Audio</button>
+          <button class="tool-btn" id="fullscreenBtn" title="Expand screen to fullscreen">⛶</button>
+          <span class="pill live" style="padding: 2px 7px; font-size: 11px;"><i class="pulse-dot on" id="liveDot"></i> <span id="liveTxt">LIVE</span></span>
         </div>
       </div>
-      <div class="box log" id="log"></div>
+      <div class="viewport-wrap" id="viewportWrap">
+        <img id="shot" alt="Live Browser Viewport">
+      </div>
+    </div>
+
+    <div class="cols">
+      <!-- Conversation Column -->
+      <div class="box" id="convo">
+        <div class="box-title">
+          <span>Live Conversation</span>
+          <span style="font-size:11px; text-transform:none;">Caller &bull; Assistant</span>
+        </div>
+        <div id="convoList"></div>
+      </div>
+
+      <!-- Agent Activity Log -->
+      <div class="box" id="logBox">
+        <div class="box-title">
+          <span>Agent Activity & Trail</span>
+          <button id="clearLogBtn" style="background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:11px;">Clear</button>
+        </div>
+        <div id="logList"></div>
+      </div>
     </div>
   </section>
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
-let ws, ctx, micCtx, micStream, worklet, outGain, mediaGain, playHead = 0, mediaHead = 0, sources = [], t0 = 0, timerId, lastSay = null;
-let sttRate = 16000, ttsRate = 48000, pageAudioOn = true, pendingScreen = null, rafScreen = 0;
+let ws = null, ctx = null, micCtx = null, micStream = null, worklet = null;
+let outGain = null, mediaGain = null;
+let sttRate = 16000, ttsRate = 48000;
+let playHead = 0, mediaHead = 0;
+let sources = [], timerId = null, lastSay = null;
+let pageAudioOn = true, currentMediaTarget = 0.95;
+let pendingScreen = null, rafScreen = 0;
+let dialedNumbers = "";
 
-function addMsg(kind, label, text) {
+// ---- UI Helpers ----
+function addMsg(kind, author, text) {
   const d = document.createElement('div');
   d.className = 'msg ' + kind;
-  d.innerHTML = `<small>${label}</small>`;
+  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  d.innerHTML = `<div class="msg-head"><span class="msg-author">${author}</span><span>${timeStr}</span></div>`;
   d.appendChild(document.createTextNode(text));
-  $('convo').appendChild(d);
-  $('convo').scrollTop = 1e9;
+  $('convoList').appendChild(d);
+  $('convo').scrollTop = $('convo').scrollHeight;
   return d;
 }
+
 function log(html) {
   const d = document.createElement('div');
+  d.className = 'log-entry';
   d.innerHTML = html;
-  $('log').appendChild(d);
-  $('log').scrollTop = 1e9;
+  $('logList').appendChild(d);
+  $('logBox').scrollTop = $('logBox').scrollHeight;
 }
 const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
-// ---- audio out: 8 kHz PCM chunks scheduled back to back ----
+// Visualizer waves animation on LCD
+function setLcdWaves(active) {
+  const bars = $('lcdWaves').querySelectorAll('span');
+  bars.forEach((b, i) => {
+    b.style.height = active ? `${Math.floor(4 + Math.random() * 12)}px` : '3px';
+  });
+}
+let waveInterval = null;
+function toggleWavePulse(on) {
+  clearInterval(waveInterval);
+  if (on) {
+    waveInterval = setInterval(() => setLcdWaves(true), 90);
+  } else {
+    setLcdWaves(false);
+  }
+}
+
+// ---- DTMF Dialtone Generator using Web Audio ----
+function playDtmfTone(char) {
+  if (!ctx) return;
+  const dtmfFrequencies = {
+    '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
+    '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
+    '7': [852, 1209], '8': [852, 1336], '9': [852, 1477],
+    '*': [941, 1209], '0': [941, 1336], '#': [941, 1477]
+  };
+  const freqs = dtmfFrequencies[char];
+  if (!freqs) return;
+  const osc1 = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
+  const toneGain = ctx.createGain();
+  osc1.frequency.value = freqs[0];
+  osc2.frequency.value = freqs[1];
+  toneGain.gain.setValueAtTime(0.08, ctx.currentTime);
+  toneGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+  osc1.connect(toneGain);
+  osc2.connect(toneGain);
+  toneGain.connect(ctx.destination);
+  osc1.start();
+  osc2.start();
+  osc1.stop(ctx.currentTime + 0.13);
+  osc2.stop(ctx.currentTime + 0.13);
+}
+
+// ---- Jitter-Free Audio Playback Engine ----
+
+// Assistant Speech: smooth gapless scheduling with micro-fades
 function playPcm(buf) {
+  if (!ctx || !outGain) return;
   const samples = Math.floor(buf.byteLength / 2);
   if (!samples) return;
   const i16 = new Int16Array(buf, 0, samples);
-  if (!i16.length) return;
-  const ab = ctx.createBuffer(1, i16.length, ttsRate);
+  const ab = ctx.createBuffer(1, samples, ttsRate || 48000);
   const ch = ab.getChannelData(0);
-  for (let i = 0; i < i16.length; i++) ch[i] = i16[i] / 32768;
+  for (let i = 0; i < samples; i++) ch[i] = i16[i] / 32768;
+
+  // Boundary smoothing: 16-sample micro ramp on start/end to prevent DC pop
+  const fade = Math.min(16, Math.floor(samples / 2));
+  for (let i = 0; i < fade; i++) {
+    const f = i / fade;
+    ch[i] *= f;
+    ch[samples - 1 - i] *= f;
+  }
+
   const src = ctx.createBufferSource();
   src.buffer = ab;
   src.connect(outGain);
+
   const now = ctx.currentTime;
-  if (playHead < now + 0.03) playHead = now + 0.03;
+  // If buffer underran or newly starting, provide an 80ms runway to absorb network arrival jitter
+  if (playHead < now) {
+    playHead = now + 0.08;
+  }
   src.start(playHead);
   playHead += ab.duration;
+
   sources.push(src);
-  src.onended = () => { sources = sources.filter(s => s !== src); updateMute(); };
+  toggleWavePulse(true);
   updateMute();
+
+  src.onended = () => {
+    sources = sources.filter(s => s !== src);
+    if (sources.length === 0) toggleWavePulse(false);
+    updateMute();
+  };
 }
+
 function clearAudio() {
   sources.forEach(s => { try { s.stop(); } catch {} });
   sources = [];
   playHead = 0;
+  toggleWavePulse(false);
   if (lastSay) lastSay.classList.add('cut');
   duck(false);
   updateMute();
 }
-// Duplex: drop to 25% volume while the caller talks, until we know who they're talking to.
+
 function duck(on) {
-  if (!outGain) return;
+  if (!outGain || !ctx) return;
   const t = ctx.currentTime;
   outGain.gain.cancelScheduledValues(t);
   outGain.gain.setTargetAtTime(on ? 0.25 : 1.0, t, on ? 0.04 : 0.12);
 }
-// ---- browser page audio out: live PCM from <video>/<audio> inside Chromium ----
-function syncMediaGain() {
+
+// Media Audio: smooth Jitter Buffer for YouTube/Video playback
+function syncMediaGain(force) {
   if (!mediaGain || !ctx) return;
-  const target = !pageAudioOn ? 0.0 : (sources.length > 0 ? 0.18 : 0.9);
+  const isSpeaking = sources.length > 0;
+  const target = !pageAudioOn ? 0.0 : (isSpeaking ? 0.18 : 0.95);
+  // Never hammer gain if already at target: prevents clicking/zipper distortion
+  if (!force && Math.abs(currentMediaTarget - target) < 0.02) return;
+  currentMediaTarget = target;
   const t = ctx.currentTime;
   mediaGain.gain.cancelScheduledValues(t);
-  mediaGain.gain.setTargetAtTime(target, t, 0.05);
+  mediaGain.gain.setTargetAtTime(target, t, 0.08);
 }
+
 function playMediaPcm(b64, rate) {
   if (!ctx || !mediaGain || !pageAudioOn || !b64) return;
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  const samples = Math.floor(bytes.byteLength / 2);
-  if (!samples) return;
-  const i16 = new Int16Array(bytes.buffer, 0, samples);
-  const ab = ctx.createBuffer(1, samples, rate || 24000);
-  const ch = ab.getChannelData(0);
-  for (let i = 0; i < samples; i++) ch[i] = i16[i] / 32768;
-  const src = ctx.createBufferSource();
-  src.buffer = ab;
-  src.connect(mediaGain);
-  const now = ctx.currentTime;
-  if (mediaHead < now + 0.02 || mediaHead > now + 0.75) mediaHead = now + 0.04;
-  src.start(mediaHead);
-  mediaHead += ab.duration;
+  try {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const samples = Math.floor(bytes.byteLength / 2);
+    if (!samples) return;
+    const i16 = new Int16Array(bytes.buffer, 0, samples);
+    const ab = ctx.createBuffer(1, samples, rate || 24000);
+    const ch = ab.getChannelData(0);
+    for (let i = 0; i < samples; i++) ch[i] = i16[i] / 32768;
+
+    // Micro-fade boundaries to prevent clicks
+    const fade = Math.min(16, Math.floor(samples / 2));
+    for (let i = 0; i < fade; i++) {
+      const f = i / fade;
+      ch[i] *= f;
+      ch[samples - 1 - i] *= f;
+    }
+
+    const src = ctx.createBufferSource();
+    src.buffer = ab;
+    src.connect(mediaGain);
+
+    const now = ctx.currentTime;
+    // Jitter Buffer logic: maintain 100-120ms safety cushion
+    if (mediaHead < now) {
+      // Underrun occurred: restart with cushion
+      mediaHead = now + 0.10;
+    } else if (mediaHead - now > 0.45) {
+      // Backlog accumulated (e.g. background tab): gently resync
+      mediaHead = now + 0.12;
+    }
+    src.start(mediaHead);
+    mediaHead += ab.duration;
+  } catch (e) {
+    console.warn("playMediaPcm error:", e);
+  }
 }
+
+// Viewport Frame Scheduler
 function scheduleScreen(m) {
   pendingScreen = m;
   if (rafScreen) return;
@@ -201,36 +692,37 @@ function scheduleScreen(m) {
     pendingScreen = null;
     if (!f) return;
     $('shot').src = 'data:image/jpeg;base64,' + f.jpeg;
-    $('url').textContent = f.url;
-    if (f.live) {
-      $('liveDot').classList.add('live');
-      $('liveTxt').textContent = 'LIVE stream';
-    }
+    $('urlInput').value = f.url || 'Dial-a-Browser';
   });
 }
 
-// Without barge-in, mute the mic while the assistant talks so it never hears itself.
 function updateMute() {
-  syncMediaGain();
+  syncMediaGain(false);
   if (!worklet) return;
   const talking = sources.length > 0;
   worklet.port.postMessage({ muted: talking && !$('barge').checked });
 }
 
+// ---- Start Call ----
 async function startCall() {
   $('dial').disabled = true;
-  // Ask the server which rates this call uses (16k in / 24k out, or 8k/8k in phone mode).
-  try { const c = await (await fetch('/config')).json(); sttRate = c.stt_rate; ttsRate = c.tts_rate; } catch {}
-  ctx = new AudioContext();                       // playback at the device rate
+  try {
+    const c = await (await fetch('/config')).json();
+    if (c.stt_rate) sttRate = c.stt_rate;
+    if (c.tts_rate) ttsRate = c.tts_rate;
+  } catch {}
+
+  ctx = new AudioContext();
   outGain = ctx.createGain();
   outGain.connect(ctx.destination);
+
   mediaGain = ctx.createGain();
-  mediaGain.gain.value = pageAudioOn ? 0.9 : 0.0;
+  mediaGain.gain.value = pageAudioOn ? 0.95 : 0.0;
   mediaGain.connect(ctx.destination);
-  // Capture in its own context at the STT rate: the browser's resampler has a proper
-  // anti-aliasing filter, which keeps consonants crisp for Prisma.
+
   try { micCtx = new AudioContext({ sampleRate: sttRate }); } catch { micCtx = new AudioContext(); }
   await micCtx.audioWorklet.addModule('/static/pcm-worklet.js');
+
   try {
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
@@ -250,15 +742,18 @@ async function startCall() {
     })();
   } catch (err) {
     micStream = null; worklet = null;
-    log('<b>no microphone</b> (' + esc(err.message) + '). Typed mode: use the box under the phone.');
+    log('<b>no microphone</b> (' + esc(err.message) + '). Typed mode active.');
   }
 
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/call`);
   ws.binaryType = 'arraybuffer';
+
   ws.onopen = () => {
     if (worklet) worklet.port.onmessage = e => { if (ws && ws.readyState === 1) ws.send(e.data); };
     ws.send(JSON.stringify({ type: 'barge_in', enabled: $('barge').checked }));
     $('end').disabled = false;
+    $('headerDot').classList.add('on');
+    $('statusTxt').textContent = 'Connected (Live Call)';
     t0 = Date.now();
     timerId = setInterval(() => {
       const s = Math.floor((Date.now() - t0) / 1000);
@@ -266,63 +761,71 @@ async function startCall() {
     }, 500);
     $('last').textContent = 'Calling…';
   };
+
   ws.onmessage = e => {
     if (typeof e.data !== 'string') return playPcm(e.data);
-    const m = JSON.parse(e.data);
-    switch (m.type) {
-      case 'say':
-        lastSay = addMsg('guide', 'Assistant', m.text);
-        $('last').textContent = m.text;
-        break;
-      case 'config':
-        if (m.stt_rate) sttRate = m.stt_rate;
-        if (m.tts_rate) ttsRate = m.tts_rate;
-        break;
-      case 'pong':
-        break;
-      case 'heard': {
-        const label = `Caller${m.lang ? ' · ' + m.lang : ''}${m.latency ? ' · ' + m.latency + ' ms' : ''}` +
-          (m.ignored ? ` · ignored: ${m.ignored.toLowerCase().replace('_', ' ')}${m.why ? ' (' + m.why + ')' : ''}` : '');
-        const d = addMsg('caller', label, m.text);
-        if (m.ignored) d.classList.add('ignored');
-        if (m.ignored) duck(false);
-        break;
+    try {
+      const m = JSON.parse(e.data);
+      switch (m.type) {
+        case 'say':
+          lastSay = addMsg('guide', 'Assistant', m.text);
+          $('last').textContent = m.text;
+          // Autonomous check: if assistant asks about login, prompt consent card
+          if (/login|sign in|लॉगिन|खाता|पासवर्ड/i.test(m.text)) {
+            showConsent("Website Sign-In Required", m.text, "Yes, please log in for me", "No, continue without logging in");
+          }
+          break;
+        case 'config':
+          if (m.stt_rate) sttRate = m.stt_rate;
+          if (m.tts_rate) ttsRate = m.tts_rate;
+          $('ratePill').textContent = `🎙️ HD ${ttsRate / 1000}k / ${sttRate / 1000}k`;
+          break;
+        case 'pong':
+          break;
+        case 'heard': {
+          const label = `Caller${m.lang ? ' · ' + m.lang : ''}${m.latency ? ' · ' + m.latency + ' ms' : ''}` +
+            (m.ignored ? ` · ignored: ${m.ignored.toLowerCase().replace('_', ' ')}` : '');
+          const d = addMsg('caller', label, m.text);
+          if (m.ignored) d.classList.add('ignored');
+          break;
+        }
+        case 'duck': duck(m.on); break;
+        case 'clear_audio': clearAudio(); log('<b>barge-in</b> audio interrupted'); break;
+        case 'action':
+          if (m.name !== 'say') {
+            log(`<span class="action-badge">${esc(m.name)}</span> ${esc(JSON.stringify(m.args))}`);
+          }
+          break;
+        case 'screen':
+          scheduleScreen(m);
+          break;
+        case 'media_audio':
+          playMediaPcm(m.pcm, m.rate);
+          break;
+        case 'sms':
+          $('sms').style.display = 'block';
+          $('sms').innerHTML = `✉ SMS: <b>${esc(m.text)}</b>`;
+          log('<b>✉ SMS Received:</b> ' + esc(m.text));
+          break;
+        case 'status':
+          log('<b>status</b> ' + esc(m.text));
+          $('statusTxt').textContent = m.text;
+          break;
+        case 'log': log(esc(m.text)); break;
+        case 'hangup': endCall(); break;
       }
-      case 'duck': duck(m.on); break;
-      case 'quota':
-        log('<b style="color:var(--danger)">LLM unavailable</b> ' + esc(m.text));
-        $('last').textContent = 'Assistant temporarily unavailable (LLM quota).';
-        break;
-      case 'clear_audio': clearAudio(); log('<b>barge-in</b> caller interrupted, audio stopped'); break;
-      case 'action':
-        if (m.name !== 'say') log(`<b>${esc(m.name)}</b> ${esc(JSON.stringify(m.args))}`);
-        break;
-      case 'screen':
-        scheduleScreen(m);
-        break;
-      case 'media_audio':
-        playMediaPcm(m.pcm, m.rate);
-        break;
-      case 'sms':
-        $('sms').style.display = 'block';
-        $('sms').textContent = '✉ SMS: ' + m.text;
-        log('<b>sms</b> ' + esc(m.text));
-        break;
-      case 'status': log('<b>status</b> ' + esc(m.text)); break;
-      case 'log': log(esc(m.text)); break;
-      case 'hangup': endCall(); break;
+    } catch (err) {
+      console.warn("ws parse error:", err);
     }
   };
+
   ws.onclose = e => {
     log(`<b>Call ended</b>${e.reason ? ' (' + esc(e.reason) + ')' : ''}`);
     endCall();
   };
-  ws.onerror = err => {
-    log(`<b>Connection error</b>`);
-  };
+  ws.onerror = () => { log(`<b>Connection error</b>`); };
 }
 
-let pingIntervalId = null;
 setInterval(() => {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'ping' }));
 }, 15000);
@@ -331,6 +834,7 @@ function endCall() {
   if (ws && ws.readyState <= 1) ws.close();
   ws = null;
   clearInterval(timerId);
+  toggleWavePulse(false);
   if (micStream) micStream.getTracks().forEach(t => t.stop());
   setTimeout(() => {
     if (ctx) { ctx.close(); ctx = null; }
@@ -340,27 +844,110 @@ function endCall() {
   mediaGain = null;
   mediaHead = 0;
   playHead = 0;
-  $('liveDot').classList.remove('live');
-  $('liveTxt').textContent = "Agent's browser (live)";
   $('dial').disabled = false;
   $('end').disabled = true;
-  $('last').textContent = 'Call ended.';
-  $('url').textContent = 'Browser idle';
+  $('headerDot').classList.remove('on');
+  $('statusTxt').textContent = 'Call Ended';
+  $('last').textContent = 'Call ended. Press green to call again.';
+  $('digits').textContent = '';
+  dialedNumbers = '';
+  $('consentCard').style.display = 'none';
 }
 
+// Consent Card helper
+function showConsent(title, desc, allowText, denyText) {
+  $('consentTitle').textContent = title;
+  $('consentDesc').textContent = desc;
+  $('consentAllowBtn').textContent = allowText || "✅ Allow / Yes";
+  $('consentDenyBtn').textContent = denyText || "❌ Deny / Skip";
+  $('consentCard').style.display = 'block';
+}
+
+$('consentAllowBtn').onclick = () => {
+  $('consentCard').style.display = 'none';
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'typed', text: 'हाँ, लॉगिन कर दो' }));
+  }
+};
+$('consentDenyBtn').onclick = () => {
+  $('consentCard').style.display = 'none';
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'typed', text: 'नहीं, लॉगिन मत करो' }));
+  }
+};
+
+// ---- Keypad & DTMF Handler ----
+document.querySelectorAll('.keys button').forEach(btn => {
+  btn.onclick = () => {
+    const k = btn.dataset.key;
+    if (!k) return;
+    playDtmfTone(k);
+    dialedNumbers = (dialedNumbers + k).slice(-16);
+    $('digits').textContent = dialedNumbers;
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'dtmf', key: k }));
+    }
+  };
+});
+
+// Quick Action Buttons
+$('quickLoginBtn').onclick = () => {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'typed', text: 'कृपया इस वेबसाइट पर साइन इन या लॉगिन कर दो' }));
+  }
+};
+
+$('quickSkipAdBtn').onclick = () => {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'skip_ad' }));
+    log('<b>Autonomous Action:</b> Skip Ad triggered');
+  }
+};
+
+// Browser Navigation Buttons
+$('navBack').onclick = () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'nav_back' })); };
+$('navFwd').onclick = () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'nav_forward' })); };
+$('navReload').onclick = () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'nav_reload' })); };
+
+$('urlGo').onclick = () => {
+  const val = $('urlInput').value.trim();
+  if (val && ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'open_url_direct', url: val }));
+  }
+};
+$('urlInput').onkeydown = e => { if (e.key === 'Enter') $('urlGo').click(); };
+
+// Page Audio Mute Toggle
 $('pageAudioBtn').onclick = () => {
   pageAudioOn = !pageAudioOn;
   $('pageAudioBtn').classList.toggle('muted', !pageAudioOn);
-  $('pageAudioBtn').textContent = pageAudioOn ? '🔊 Page Audio' : '🔇 Page Audio';
-  syncMediaGain();
+  $('pageAudioBtn').classList.toggle('active', pageAudioOn);
+  $('pageAudioBtn').textContent = pageAudioOn ? '🔊 Audio' : '🔇 Muted';
+  syncMediaGain(true);
 };
 
+// Fullscreen Expand Toggle
+$('fullscreenBtn').onclick = () => {
+  const isFull = $('stage').classList.toggle('fullscreen');
+  $('fullscreenBtn').textContent = isFull ? '✕' : '⛶';
+};
+
+// Direct Interaction: Clicks & Wheel on Screen
 $('shot').addEventListener('click', e => {
   if (!ws || ws.readyState !== 1) return;
   const img = $('shot');
   const rect = img.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
-  const natRatio = (img.naturalWidth && img.naturalHeight) ? (img.naturalWidth / img.naturalHeight) : (1280 / 800);
+
+  // Add click ripple animation
+  const ripple = document.createElement('div');
+  ripple.className = 'click-ripple';
+  ripple.style.left = `${e.clientX - rect.left}px`;
+  ripple.style.top = `${e.clientY - rect.top}px`;
+  $('viewportWrap').appendChild(ripple);
+  setTimeout(() => ripple.remove(), 450);
+
+  const natRatio = (img.naturalWidth && img.naturalHeight) ? (img.naturalWidth / img.naturalHeight) : (16 / 10);
   const boxRatio = rect.width / rect.height;
   let drawW = rect.width, drawH = rect.height, offX = 0, offY = 0;
   if (boxRatio > natRatio) {
@@ -383,6 +970,7 @@ $('shot').addEventListener('wheel', e => {
   ws.send(JSON.stringify({ type: 'ui_wheel', dy: e.deltaY }));
 }, { passive: false });
 
+// Controls
 $('dial').onclick = () => startCall().catch(err => { log('error: ' + esc(err.message)); $('dial').disabled = false; });
 $('end').onclick = endCall;
 $('barge').onchange = () => {
@@ -395,6 +983,7 @@ $('typed').onkeydown = e => {
     e.target.value = '';
   }
 };
+$('clearLogBtn').onclick = () => { $('logList').innerHTML = ''; };
 </script>
 </body>
 </html>

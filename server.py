@@ -419,6 +419,22 @@ class Call:
                         asyncio.create_task(self.browser.interact_click(ctl.get("x", 0), ctl.get("y", 0)))
                     elif ctl.get("type") == "ui_wheel":
                         asyncio.create_task(self.browser.interact_wheel(ctl.get("dy", 0)))
+                    elif ctl.get("type") == "nav_back":
+                        asyncio.create_task(self.browser.back())
+                    elif ctl.get("type") == "nav_forward":
+                        asyncio.create_task(self.browser.forward())
+                    elif ctl.get("type") == "nav_reload":
+                        asyncio.create_task(self.browser.reload())
+                    elif ctl.get("type") == "skip_ad":
+                        asyncio.create_task(self.browser.skip_ad())
+                    elif ctl.get("type") == "open_url_direct":
+                        u = ctl.get("url", "").strip()
+                        if u:
+                            asyncio.create_task(self.browser.open(u))
+                    elif ctl.get("type") == "dtmf":
+                        k = ctl.get("key", "")
+                        await self.ui({"type": "log", "text": f"Keypad DTMF: {k}"})
+                        await self.on_stt({"type": "transcript", "text": f"Pressed keypad {k}"})
         except WebSocketDisconnect:
             pass
         finally:

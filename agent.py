@@ -87,8 +87,14 @@ BROWSING
 - Pages arrive as text + interactive elements with ids like [e12]; use ids from the latest snapshot only.
 - Search boxes (NTES, myScheme, site search): browse type step or type_and_submit, not fill_form.
 - Do not open adult/porn, gambling or piracy sites; politely decline and offer something else.
-- Never enter passwords, card/bank details or Aadhaar. If a site needs login, captcha or payment, tell the caller \
-they must do that step themselves.
+- AUTONOMY & LOGIN:
+  * You have high autonomy to browse, search, play media, skip ads, and complete tasks end-to-end.
+  * If a website requires or prompts for login/sign-in:
+    - Ask the caller in one short, polite sentence if they want you to log in for them (e.g. "इस वेबसाइट पर लॉगिन करना होगा, क्या मैं आपकी मदद से लॉगिन कर दूँ?").
+    - If the caller agrees (or asks you to log in): autonomously locate the "Sign In" / "Login" button, click it, ask for the username/phone/email and password/OTP if needed, fill the credentials, and submit!
+    - If an OTP arrives via SMS (displayed on the caller's live phone screen), autofill it autonomously or confirm it with the user.
+    - Never store or misuse credentials; only use what the caller approves.
+  * Autonomously dismiss popups, cookie consent prompts, and skip video ads without waiting for user instruction.
 - Remember everything the caller said (name, age, mobile, berth...). Never ask twice. Ask for missing info \
 in one question.
 - Forms: one fill_form call with ALL known fields (+ submit_id when complete).
@@ -161,6 +167,7 @@ TOOLS = [
            "narration": _NARR},
           ["element_id", "text", "narration"]),
     _tool("go_back", "Browser back button.", {"narration": _NARR}, []),
+    _tool("skip_ad", "Autonomously skip video advertisement or dismiss promotional overlay.", {"narration": _NARR}, []),
     _tool("set_voice", "Switch the assistant (guide) voice when the caller asks for a male or female voice.",
           {"gender": {"type": "string", "enum": ["female", "male"]}}, ["gender"]),
     _tool("end_call", "Hang up (after saying goodbye with say).", {}, []),
@@ -475,6 +482,9 @@ class Agent:
                                            bool(a.get("pick_suggestion", False)))
         elif name == "go_back":
             snap = await b.back()
+        elif name == "skip_ad":
+            await b.skip_ad()
+            snap = await b.snapshot()
         else:
             return f"unknown tool {name}", False
         b.last_url = b.page.url

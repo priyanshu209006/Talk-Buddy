@@ -13,6 +13,146 @@
     {
      "do": "type",
      "target": "From Station*",
+     "text": "Patna Jn",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "New Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Patna Jn",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "New Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "click",
+     "target": "Trains B/w Stations"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Patna",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    },
+    {
+     "do": "click",
+     "target": "Clear"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Patna Jn",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "New Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "click",
+     "target": "Clear"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Patna Jn",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "New Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "click",
+     "target": "Trains B/w Stations"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Patna",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://enquiry.indianrail.gov.in/mntes/"
+    },
+    {
+     "do": "click",
+     "target": "Trains B/w Stations"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
      "text": "Gaya",
      "pick": true
     },
@@ -40,190 +180,6 @@
      "do": "type",
      "target": "To Station*",
      "text": "New Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    }
-   ]
-  },
-  {
-   "steps": [
-    {
-     "do": "click",
-     "target": "Clear"
-    },
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Gaya",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "New Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    }
-   ]
-  },
-  {
-   "steps": [
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Gaya",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    }
-   ]
-  },
-  {
-   "steps": [
-    {
-     "do": "open",
-     "url": "https://enquiry.indianrail.gov.in/mntes/"
-    },
-    {
-     "do": "click",
-     "target": "Trains B/w Stations"
-    }
-   ]
-  },
-  {
-   "steps": [
-    {
-     "do": "open",
-     "url": "https://enquiry.indianrail.gov.in/mntes/"
-    },
-    {
-     "do": "click",
-     "target": "Trains B/w Stations"
-    },
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Roni",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    },
-    {
-     "do": "click",
-     "target": "Clear"
-    },
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Roni",
-     "enter": false
-    },
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Roni",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    },
-    {
-     "do": "click",
-     "target": "Clear"
-    },
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Roni",
-     "enter": false
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "DLI",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    },
-    {
-     "do": "click",
-     "target": "Clear"
-    },
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Barauni",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "DLI",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    }
-   ]
-  },
-  {
-   "steps": [
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "DLI",
      "pick": true
     },
     {
@@ -234,6 +190,41 @@
   }
  ],
  "www.myscheme.gov.in": [
+  {
+   "steps": [
+    {
+     "do": "type",
+     "target": "Search",
+     "text": "widow pension"
+    },
+    {
+     "do": "type",
+     "target": "beneficiary state filter",
+     "text": "Bihar",
+     "pick": true
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "type",
+     "target": "Search",
+     "text": "widow pension",
+     "enter": true
+    },
+    {
+     "do": "type",
+     "target": "beneficiary state filter",
+     "text": "Bihar",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Indira Gandhi National Widow Pension Scheme- Bihar"
+    }
+   ]
+  },
   {
    "steps": [
     {
@@ -264,6 +255,35 @@
     {
      "do": "click",
      "target": "सरसों का साग"
+    }
+   ]
+  }
+ ],
+ "stellarium-web.org": [
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://stellarium-web.org/"
+    },
+    {
+     "do": "type",
+     "target": "Search...",
+     "text": "Saturn"
+    }
+   ]
+  }
+ ],
+ "www.youtube.com": [
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.youtube.com/results?search_query=best+hindi+songs"
+    },
+    {
+     "do": "click",
+     "target": "Arijit Singh Hit Songs - 8K Video Jukebox | Kesariya, Gerua, Hawayein, Tera Chehra | Nonstop Hits"
     }
    ]
   }

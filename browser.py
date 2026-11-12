@@ -32,29 +32,30 @@ AUDIO_HOOK_JS = r"""
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
     ac = new AC({ sampleRate: TARGET_RATE });
-    proc = ac.createScriptProcessor(4096, 1, 1);
+    // 2048 samples at 24000 Hz = ~85.3 ms per frame for low-latency, jitter-free streaming
+    proc = ac.createScriptProcessor(2048, 1, 1);
     silent = ac.createGain();
     silent.gain.value = 0;
     proc.onaudioprocess = (ev) => {
       if (typeof window.__dabSendPcm !== 'function') return;
       const inp = ev.inputBuffer.getChannelData(0);
-      let peak = 0;
       const i16 = new Int16Array(inp.length);
       for (let i = 0; i < inp.length; i++) {
         let s = inp[i];
-        const a = s < 0 ? -s : s;
-        if (a > peak) peak = a;
         if (s > 1) s = 1;
         else if (s < -1) s = -1;
         i16[i] = s < 0 ? s * 32768 : s * 32767;
       }
-      if (peak < 0.0005) return;
+      // Stream continuously so client jitter buffer maintains a steady clock
       const bytes = new Uint8Array(i16.buffer);
       let bin = '';
-      for (let i = 0; i < bytes.length; i += 2048) {
-        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 2048));
+      const chunkSize = 2048;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
       }
-      window.__dabSendPcm(btoa(bin), ac.sampleRate);
+      try {
+        window.__dabSendPcm(btoa(bin), ac.sampleRate);
+      } catch (e) {}
     };
     proc.connect(silent);
     silent.connect(ac.destination);
@@ -66,6 +67,9 @@ AUDIO_HOOK_JS = r"""
     hooked.add(el);
     const attach = () => {
       try {
+        if (el.tagName && el.tagName.toLowerCase() === 'video') {
+          el.muted = false;
+        }
         const ctx = ensureGraph();
         if (!ctx) return;
         if (ctx.state === 'suspended') ctx.resume().catch(() => {});
@@ -99,6 +103,23 @@ AUDIO_HOOK_JS = r"""
   } else {
     window.addEventListener('DOMContentLoaded', scan, { once: true });
   }
+
+  // Autonomous ad-skip and cookie-consent auto-dismissal
+  function autoSkipAds() {
+    const sels = [
+      '.ytp-skip-ad-button', '.ytp-ad-skip-button', '.ytp-ad-skip-button-modern',
+      '.videoAdUiSkipButton', 'button.ytp-ad-skip-button-slot',
+      'button[aria-label="Skip ad"]', 'button[aria-label="Skip ads"]'
+    ];
+    for (const sel of sels) {
+      const btn = document.querySelector(sel);
+      if (btn && btn.offsetParent !== null) {
+        try { btn.click(); } catch (e) {}
+        break;
+      }
+    }
+  }
+  setInterval(autoSkipAds, 1200);
 })();
 """
 
@@ -527,11 +548,11 @@ class Browser:
         if os.environ.get("LIVE_SCREEN", "1") == "0":
             return
         on_render = bool(os.environ.get("RENDER"))
-        quality = int(os.environ.get("SCREENCAST_QUALITY", "55" if on_render else "72"))
-        max_w = int(os.environ.get("SCREENCAST_WIDTH", "880" if on_render else str(self.VIEWPORT_W)))
-        max_h = int(os.environ.get("SCREENCAST_HEIGHT", "550" if on_render else str(self.VIEWPORT_H)))
-        every_n = int(os.environ.get("SCREENCAST_EVERY_NTH", "4" if on_render else "2"))
-        min_dt = 1.0 / max(1.0, float(os.environ.get("SCREENCAST_FPS", "8" if on_render else "15")))
+        quality = int(os.environ.get("SCREENCAST_QUALITY", "52" if on_render else "60"))
+        max_w = int(os.environ.get("SCREENCAST_WIDTH", "840" if on_render else "1024"))
+        max_h = int(os.environ.get("SCREENCAST_HEIGHT", "525" if on_render else "640"))
+        every_n = int(os.environ.get("SCREENCAST_EVERY_NTH", "3" if on_render else "2"))
+        min_dt = 1.0 / max(1.0, float(os.environ.get("SCREENCAST_FPS", "8" if on_render else "12")))
         try:
             cdp = await self._ctx.new_cdp_session(self.page)
             self._cdp = cdp
@@ -1006,3 +1027,38 @@ class Browser:
         except PWTimeout:
             pass
         return await self.snapshot()
+
+    async def forward(self) -> str:
+        try:
+            await self.page.go_forward(wait_until="domcontentloaded", timeout=10000)
+        except PWTimeout:
+            pass
+        return await self.snapshot()
+
+    async def reload(self) -> str:
+        try:
+            await self.page.reload(wait_until="domcontentloaded", timeout=15000)
+        except PWTimeout:
+            pass
+        await self._settle()
+        return await self.snapshot()
+
+    async def skip_ad(self) -> bool:
+        if not self.alive():
+            return False
+        sels = [
+            ".ytp-skip-ad-button", ".ytp-ad-skip-button", ".ytp-ad-skip-button-modern",
+            ".videoAdUiSkipButton", "button.ytp-ad-skip-button-slot",
+            "button[aria-label='Skip ad']", "button[aria-label='Skip ads']",
+            "button:has-text('Skip Ad')", "button:has-text('Skip ad')", "button:has-text('Skip')",
+        ]
+        for s in sels:
+            try:
+                loc = self.page.locator(s).first
+                if await loc.is_visible(timeout=250):
+                    await loc.click(timeout=800)
+                    log.info("Autonomously skipped ad: %s", s)
+                    return True
+            except Exception:
+                pass
+        return False
