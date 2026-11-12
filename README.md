@@ -1,3 +1,12 @@
+---
+title: Talk Buddy (Dial-a-Browser)
+emoji: 📞
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 7860
+---
+
 # Talk Buddy (Dial-a-Browser)
 
 **Every website in India becomes a phone number.** The caller speaks Hindi, Hinglish or any of 10 Indian
