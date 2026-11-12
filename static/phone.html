@@ -39,9 +39,12 @@
   .stage{display:grid;grid-template-rows:auto 1fr;gap:16px;min-width:0}
   .screen{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .bar{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12.5px}
-  .bar .dot{width:9px;height:9px;border-radius:50%;background:#444}
+  .bar .dot{width:9px;height:9px;border-radius:50%;background:#444;transition:background .2s,box-shadow .2s}
+  .bar .dot.live{background:#4fd1a5;box-shadow:0 0 8px #4fd1a5}
   .bar .url{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#0d0f13;padding:4px 8px;border-radius:5px}
-  #shot{display:block;width:100%;aspect-ratio:1100/760;object-fit:contain;background:#0d0f13;color:transparent}
+  .bar button{background:#232834;border:1px solid var(--line);color:var(--text);padding:3px 9px;border-radius:5px;font-size:12px;cursor:pointer}
+  .bar button.muted{opacity:.55;color:var(--muted)}
+  #shot{display:block;width:100%;aspect-ratio:1280/800;object-fit:contain;background:#0d0f13;color:transparent;cursor:pointer}
   #shot:not([src]){visibility:hidden}
   .cols{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;min-height:0}
   @media(max-width:1100px){.cols{grid-template-columns:1fr}}
@@ -90,7 +93,7 @@
 
   <section class="stage">
     <div class="screen">
-      <div class="bar"><span class="dot"></span><span class="url" id="url">Browser idle</span><span>Agent's browser (server side)</span></div>
+      <div class="bar"><span class="dot" id="liveDot"></span><span class="url" id="url">Browser idle</span><span id="liveTxt">Agent's browser (live)</span><button id="pageAudioBtn" title="Toggle audio from browser video/audio elements">🔊 Page Audio</button></div>
       <img id="shot" alt="Live view of the agent's browser">
     </div>
     <div class="cols">
@@ -107,8 +110,8 @@
 
 <script>
 const $ = id => document.getElementById(id);
-let ws, ctx, micCtx, micStream, worklet, outGain, playHead = 0, sources = [], t0 = 0, timerId, lastSay = null;
-let sttRate = 16000, ttsRate = 48000;
+let ws, ctx, micCtx, micStream, worklet, outGain, mediaGain, playHead = 0, mediaHead = 0, sources = [], t0 = 0, timerId, lastSay = null;
+let sttRate = 16000, ttsRate = 48000, pageAudioOn = true, pendingScreen = null, rafScreen = 0;
 
 function addMsg(kind, label, text) {
   const d = document.createElement('div');
@@ -162,8 +165,53 @@ function duck(on) {
   outGain.gain.cancelScheduledValues(t);
   outGain.gain.setTargetAtTime(on ? 0.25 : 1.0, t, on ? 0.04 : 0.12);
 }
+// ---- browser page audio out: live PCM from <video>/<audio> inside Chromium ----
+function syncMediaGain() {
+  if (!mediaGain || !ctx) return;
+  const target = !pageAudioOn ? 0.0 : (sources.length > 0 ? 0.18 : 0.9);
+  const t = ctx.currentTime;
+  mediaGain.gain.cancelScheduledValues(t);
+  mediaGain.gain.setTargetAtTime(target, t, 0.05);
+}
+function playMediaPcm(b64, rate) {
+  if (!ctx || !mediaGain || !pageAudioOn || !b64) return;
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const samples = Math.floor(bytes.byteLength / 2);
+  if (!samples) return;
+  const i16 = new Int16Array(bytes.buffer, 0, samples);
+  const ab = ctx.createBuffer(1, samples, rate || 24000);
+  const ch = ab.getChannelData(0);
+  for (let i = 0; i < samples; i++) ch[i] = i16[i] / 32768;
+  const src = ctx.createBufferSource();
+  src.buffer = ab;
+  src.connect(mediaGain);
+  const now = ctx.currentTime;
+  if (mediaHead < now + 0.02 || mediaHead > now + 0.75) mediaHead = now + 0.04;
+  src.start(mediaHead);
+  mediaHead += ab.duration;
+}
+function scheduleScreen(m) {
+  pendingScreen = m;
+  if (rafScreen) return;
+  rafScreen = requestAnimationFrame(() => {
+    rafScreen = 0;
+    const f = pendingScreen;
+    pendingScreen = null;
+    if (!f) return;
+    $('shot').src = 'data:image/jpeg;base64,' + f.jpeg;
+    $('url').textContent = f.url;
+    if (f.live) {
+      $('liveDot').classList.add('live');
+      $('liveTxt').textContent = 'LIVE stream';
+    }
+  });
+}
+
 // Without barge-in, mute the mic while the assistant talks so it never hears itself.
 function updateMute() {
+  syncMediaGain();
   if (!worklet) return;
   const talking = sources.length > 0;
   worklet.port.postMessage({ muted: talking && !$('barge').checked });
@@ -176,6 +224,9 @@ async function startCall() {
   ctx = new AudioContext();                       // playback at the device rate
   outGain = ctx.createGain();
   outGain.connect(ctx.destination);
+  mediaGain = ctx.createGain();
+  mediaGain.gain.value = pageAudioOn ? 0.9 : 0.0;
+  mediaGain.connect(ctx.destination);
   // Capture in its own context at the STT rate: the browser's resampler has a proper
   // anti-aliasing filter, which keeps consonants crisp for Prisma.
   try { micCtx = new AudioContext({ sampleRate: sttRate }); } catch { micCtx = new AudioContext(); }
@@ -247,8 +298,10 @@ async function startCall() {
         if (m.name !== 'say') log(`<b>${esc(m.name)}</b> ${esc(JSON.stringify(m.args))}`);
         break;
       case 'screen':
-        $('shot').src = 'data:image/jpeg;base64,' + m.jpeg;
-        $('url').textContent = m.url;
+        scheduleScreen(m);
+        break;
+      case 'media_audio':
+        playMediaPcm(m.pcm, m.rate);
         break;
       case 'sms':
         $('sms').style.display = 'block';
@@ -284,11 +337,51 @@ function endCall() {
     if (micCtx) { micCtx.close(); micCtx = null; }
   }, 300);
   worklet = null;
+  mediaGain = null;
+  mediaHead = 0;
+  playHead = 0;
+  $('liveDot').classList.remove('live');
+  $('liveTxt').textContent = "Agent's browser (live)";
   $('dial').disabled = false;
   $('end').disabled = true;
   $('last').textContent = 'Call ended.';
   $('url').textContent = 'Browser idle';
 }
+
+$('pageAudioBtn').onclick = () => {
+  pageAudioOn = !pageAudioOn;
+  $('pageAudioBtn').classList.toggle('muted', !pageAudioOn);
+  $('pageAudioBtn').textContent = pageAudioOn ? '🔊 Page Audio' : '🔇 Page Audio';
+  syncMediaGain();
+};
+
+$('shot').addEventListener('click', e => {
+  if (!ws || ws.readyState !== 1) return;
+  const img = $('shot');
+  const rect = img.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const natRatio = (img.naturalWidth && img.naturalHeight) ? (img.naturalWidth / img.naturalHeight) : (1280 / 800);
+  const boxRatio = rect.width / rect.height;
+  let drawW = rect.width, drawH = rect.height, offX = 0, offY = 0;
+  if (boxRatio > natRatio) {
+    drawW = rect.height * natRatio;
+    offX = (rect.width - drawW) / 2;
+  } else if (boxRatio < natRatio) {
+    drawH = rect.width / natRatio;
+    offY = (rect.height - drawH) / 2;
+  }
+  const nx = (e.clientX - rect.left - offX) / drawW;
+  const ny = (e.clientY - rect.top - offY) / drawH;
+  if (nx >= 0 && nx <= 1 && ny >= 0 && ny <= 1) {
+    ws.send(JSON.stringify({ type: 'ui_click', x: nx, y: ny }));
+  }
+});
+
+$('shot').addEventListener('wheel', e => {
+  if (!ws || ws.readyState !== 1) return;
+  e.preventDefault();
+  ws.send(JSON.stringify({ type: 'ui_wheel', dy: e.deltaY }));
+}, { passive: false });
 
 $('dial').onclick = () => startCall().catch(err => { log('error: ' + esc(err.message)); $('dial').disabled = false; });
 $('end').onclick = endCall;

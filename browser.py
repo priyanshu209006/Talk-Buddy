@@ -1,4 +1,5 @@
 """A real Chromium the agent drives, plus a page->text compressor built for speech."""
+import asyncio
 import base64
 import logging
 import os
@@ -11,7 +12,93 @@ from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 import adapters
 
 log = logging.getLogger("browser")
-os.environ.setdefault("NODE_OPTIONS", "--max-old-space-size=64")
+os.environ.setdefault("NODE_OPTIONS", "--max-old-space-size=128")
+
+# Capture playing <video>/<audio> streams inside the page without OS loopback or double audio,
+# streaming 24 kHz mono Int16 PCM back to Python via Playwright's exposed __dabSendPcm binding.
+AUDIO_HOOK_JS = r"""
+(() => {
+  if (window.__dabAudioHooked) return;
+  window.__dabAudioHooked = true;
+
+  const TARGET_RATE = 24000;
+  let ac = null;
+  let proc = null;
+  let silent = null;
+  const hooked = new WeakSet();
+
+  function ensureGraph() {
+    if (ac) return ac;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ac = new AC({ sampleRate: TARGET_RATE });
+    proc = ac.createScriptProcessor(4096, 1, 1);
+    silent = ac.createGain();
+    silent.gain.value = 0;
+    proc.onaudioprocess = (ev) => {
+      if (typeof window.__dabSendPcm !== 'function') return;
+      const inp = ev.inputBuffer.getChannelData(0);
+      let peak = 0;
+      const i16 = new Int16Array(inp.length);
+      for (let i = 0; i < inp.length; i++) {
+        let s = inp[i];
+        const a = s < 0 ? -s : s;
+        if (a > peak) peak = a;
+        if (s > 1) s = 1;
+        else if (s < -1) s = -1;
+        i16[i] = s < 0 ? s * 32768 : s * 32767;
+      }
+      if (peak < 0.0005) return;
+      const bytes = new Uint8Array(i16.buffer);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      window.__dabSendPcm(btoa(bin), ac.sampleRate);
+    };
+    proc.connect(silent);
+    silent.connect(ac.destination);
+    return ac;
+  }
+
+  function hookEl(el) {
+    if (!el || hooked.has(el)) return;
+    hooked.add(el);
+    const attach = () => {
+      try {
+        const ctx = ensureGraph();
+        if (!ctx) return;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const src = ctx.createMediaElementSource(el);
+        const gain = ctx.createGain();
+        const syncVol = () => { gain.gain.value = el.muted ? 0 : (el.volume ?? 1); };
+        syncVol();
+        el.addEventListener('volumechange', syncVol);
+        src.connect(gain);
+        gain.connect(proc);
+      } catch (e) {}
+    };
+    if (!el.paused) attach();
+    el.addEventListener('play', attach, { once: true });
+    el.addEventListener('playing', attach, { once: true });
+  }
+
+  const origPlay = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function(...args) {
+    hookEl(this);
+    return origPlay.apply(this, args);
+  };
+
+  function scan() {
+    document.querySelectorAll('video, audio').forEach(hookEl);
+  }
+  document.addEventListener('playing', e => hookEl(e.target), true);
+  if (document.documentElement) {
+    scan();
+    new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
+  } else {
+    window.addEventListener('DOMContentLoaded', scan, { once: true });
+  }
+})();
+"""
 
 # Walk the DOM, tag every visible interactive element with a short id the LLM can
 # refer to, and return a compact text rendering of what a sighted user would see.
@@ -224,6 +311,8 @@ async def shared_browser():
             "--disable-accelerated-2d-canvas",
             "--renderer-process-limit=1",
             "--no-zygote",
+            "--in-process-gpu",
+            "--disable-site-isolation-trials",
             "--js-flags=--max-old-space-size=64",
             "--disk-cache-size=1",
             "--media-cache-size=1",
@@ -231,7 +320,7 @@ async def shared_browser():
             "--disable-background-networking",
             "--disable-default-apps",
             "--disable-sync",
-            "--mute-audio",
+            "--autoplay-policy=no-user-gesture-required",
         ]
         if not headless:
             args.extend(["--window-position=-32000,-32000", "--window-size=1280,800"])
@@ -255,11 +344,21 @@ async def shared_browser():
 
 
 class Browser:
+    VIEWPORT_W = 1280
+    VIEWPORT_H = 800
+
     def __init__(self):
         self._pw = None
         self._browser = None
         self.page = None
         self.corpus = ""          # text of the latest page snapshot (for site-voice grounding)
+        self._on_frame = None
+        self._on_audio = None
+        self._cdp = None
+        self._sc_task = None
+        self._sc_pending = None
+        self._sc_last_at = 0.0
+        self._sc_enabled = False
 
     def grounded(self, text: str) -> tuple[bool, float]:
         """Is `text` actually on the current page? Share of its words/numbers found there."""
@@ -273,9 +372,11 @@ class Browser:
         share = hits / len(words)
         return share >= 0.8, share
 
-    async def start(self):
+    async def start(self, on_frame=None, on_audio=None):
         # One browser process for the whole server (launched at startup, ~3 s saved per call);
         # each call gets its own isolated context.
+        self._on_frame = on_frame
+        self._on_audio = on_audio
         self._browser = await shared_browser()
         user_agent = os.environ.get(
             "BROWSER_USER_AGENT",
@@ -285,7 +386,7 @@ class Browser:
         proxy = {"server": proxy_url} if proxy_url else None
 
         self._ctx = await self._browser.new_context(
-            viewport={"width": 1280, "height": 800},
+            viewport={"width": self.VIEWPORT_W, "height": self.VIEWPORT_H},
             user_agent=user_agent,
             locale="en-IN",
             timezone_id="Asia/Kolkata",
@@ -299,10 +400,10 @@ class Browser:
                 "Accept-Language": "en-IN,en-US;q=0.9,en;q=0.8,hi;q=0.7",
             },
         )
-        # Block telemetry, ads, web fonts, and media streams to stay under Render Free's 512 MB cap
+        # Block telemetry, ads, and web fonts to keep RAM low while allowing audio/video media streams.
         async def block_trackers(route):
             req = route.request
-            if req.resource_type in ("font", "media"):
+            if req.resource_type == "font":
                 await route.abort()
                 return
             u = req.url.lower()
@@ -322,7 +423,16 @@ class Browser:
 
         await self._ctx.route("**/*", block_trackers)
         await self._ctx.add_init_script(STEALTH_JS)
+        if self._on_audio:
+            await self._ctx.add_init_script(AUDIO_HOOK_JS)
+            async def _on_pcm(b64: str, rate: int = 24000):
+                try:
+                    await self._on_audio(int(rate or 24000), b64)
+                except Exception:
+                    pass
+            await self._ctx.expose_function("__dabSendPcm", _on_pcm)
         self.page = await self._ctx.new_page()
+        await self._attach_screencast()
 
     async def init_page(self):
         try:
@@ -391,6 +501,101 @@ class Browser:
     def alive(self) -> bool:
         return bool(self._browser and self._browser.is_connected() and self.page and not self.page.is_closed())
 
+    async def _stop_screencast(self):
+        cdp = self._cdp
+        self._cdp = None
+        self._sc_enabled = False
+        self._sc_pending = None
+        if cdp:
+            try:
+                await cdp.send("Page.stopScreencast")
+            except Exception:
+                pass
+            try:
+                await cdp.detach()
+            except Exception:
+                pass
+
+    async def _attach_screencast(self):
+        """Stream live viewport JPEG frames via CDP so animations, scrolling, and video play in real time."""
+        await self._stop_screencast()
+        if not self._on_frame or not self._ctx or not self.page or self.page.is_closed():
+            return
+        if os.environ.get("LIVE_SCREEN", "1") == "0":
+            return
+        on_render = bool(os.environ.get("RENDER"))
+        quality = int(os.environ.get("SCREENCAST_QUALITY", "55" if on_render else "72"))
+        max_w = int(os.environ.get("SCREENCAST_WIDTH", "880" if on_render else str(self.VIEWPORT_W)))
+        max_h = int(os.environ.get("SCREENCAST_HEIGHT", "550" if on_render else str(self.VIEWPORT_H)))
+        every_n = int(os.environ.get("SCREENCAST_EVERY_NTH", "4" if on_render else "2"))
+        min_dt = 1.0 / max(1.0, float(os.environ.get("SCREENCAST_FPS", "8" if on_render else "15")))
+        try:
+            cdp = await self._ctx.new_cdp_session(self.page)
+            self._cdp = cdp
+            self._sc_enabled = True
+            self._sc_last_at = 0.0
+
+            async def _flush_frames():
+                try:
+                    while self._sc_enabled and self._sc_pending is not None:
+                        b64 = self._sc_pending
+                        self._sc_pending = None
+                        now = time.monotonic()
+                        wait = min_dt - (now - self._sc_last_at)
+                        if wait > 0.005:
+                            await asyncio.sleep(wait)
+                        self._sc_last_at = time.monotonic()
+                        raw_url = self.page.url if (self.page and not self.page.is_closed()) else ""
+                        url = "Ready: Dial-a-Browser" if (not raw_url or raw_url == "about:blank" or raw_url.startswith("data:text/html")) else raw_url
+                        await self._on_frame(url, b64)
+                except Exception:
+                    pass
+                finally:
+                    self._sc_task = None
+
+            async def _ack(sid):
+                try:
+                    await cdp.send("Page.screencastFrameAck", {"sessionId": sid})
+                except Exception:
+                    pass
+
+            def _on_sc(ev):
+                asyncio.create_task(_ack(ev["sessionId"]))
+                if not self._sc_enabled:
+                    return
+                self._sc_pending = ev["data"]
+                if self._sc_task is None or self._sc_task.done():
+                    self._sc_task = asyncio.create_task(_flush_frames())
+
+            cdp.on("Page.screencastFrame", _on_sc)
+            await cdp.send("Page.startScreencast", {
+                "format": "jpeg",
+                "quality": quality,
+                "maxWidth": max_w,
+                "maxHeight": max_h,
+                "everyNthFrame": every_n,
+            })
+        except Exception as e:
+            log.warning("screencast start failed: %s", e)
+
+    async def interact_click(self, nx: float, ny: float):
+        if not self.alive():
+            return
+        x = max(0.0, min(float(self.VIEWPORT_W - 1), float(nx) * self.VIEWPORT_W))
+        y = max(0.0, min(float(self.VIEWPORT_H - 1), float(ny) * self.VIEWPORT_H))
+        try:
+            await self.page.mouse.click(x, y)
+        except Exception as e:
+            log.debug("interact_click failed: %s", e)
+
+    async def interact_wheel(self, dy: float):
+        if not self.alive():
+            return
+        try:
+            await self.page.mouse.wheel(0, max(-1200.0, min(1200.0, float(dy))))
+        except Exception as e:
+            log.debug("interact_wheel failed: %s", e)
+
     async def restart(self, url: str | None = None):
         """Relaunch after the browser died, and reopen where we were."""
         log.warning("browser died; relaunching")
@@ -399,7 +604,7 @@ class Browser:
         except Exception:
             pass
         self._browser = self.page = None
-        await self.start()
+        await self.start(on_frame=self._on_frame, on_audio=self._on_audio)
         if url and url.startswith("http"):
             try:
                 await self.page.goto(url, wait_until="domcontentloaded", timeout=25000)
@@ -409,6 +614,7 @@ class Browser:
 
     async def close(self):
         """Close this call's context only; the shared browser stays warm for the next call."""
+        await self._stop_screencast()
         ctx = getattr(self, "_ctx", None)
         if ctx:
             try:
@@ -515,6 +721,7 @@ class Browser:
         except Exception:
             if self.page is None or self.page.is_closed():
                 self.page = await self._ctx.new_page()
+        await self._attach_screencast()
 
     async def _wait_images(self, timeout_ms: int = 2000):
         """Wait briefly for visible <img> tags on gallery pages to finish decoding."""

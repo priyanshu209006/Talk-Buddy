@@ -174,10 +174,20 @@ class Call:
             img = await self.browser.screenshot_b64()
             if img:
                 raw_url = self.browser.page.url if (self.browser and self.browser.page) else ""
-                url = "Ready: Dial-a-Browser" if (not raw_url or raw_url == "about:blank") else raw_url
+                url = "Ready: Dial-a-Browser" if (not raw_url or raw_url == "about:blank" or raw_url.startswith("data:text/html")) else raw_url
                 await self.ui({"type": "screen", "url": url, "jpeg": img})
         except Exception as e:
             log.warning("push_screen failed: %s", e)
+
+    async def on_browser_frame(self, url: str, jpeg_b64: str):
+        if self.closed:
+            return
+        await self.ui({"type": "screen", "url": url, "jpeg": jpeg_b64, "live": True})
+
+    async def on_browser_audio(self, rate: int, pcm_b64: str):
+        if self.closed:
+            return
+        await self.ui({"type": "media_audio", "rate": rate, "pcm": pcm_b64})
 
     def pop_notes(self):
         n, self.notes = self.notes, []
@@ -361,10 +371,17 @@ class Call:
     async def run(self):
         await self.ui({"type": "status", "text": "Connecting…"})
         await self.ui({"type": "config", "stt_rate": gnani.STT_RATE, "tts_rate": gnani.TTS_RATE})
-        await self.browser.start()
-        await self.browser.init_page()
-        await self.push_screen()
-        await self.stt.connect()
+        try:
+            await self.browser.start(on_frame=self.on_browser_frame, on_audio=self.on_browser_audio)
+            await self.browser.init_page()
+            await self.push_screen()
+            await self.stt.connect()
+        except Exception as e:
+            log.exception("call startup failed")
+            await self.ui({"type": "log", "text": f"Startup failed: {e}"})
+            await self.browser.close()
+            await self.stt.close()
+            raise
         loop = asyncio.get_running_loop()
 
         def on_otp(mobile, otp, sms):
@@ -396,6 +413,10 @@ class Call:
                         self.barge_in = bool(ctl.get("enabled"))
                     elif ctl.get("type") == "typed":      # debug: type instead of speaking
                         await self.on_stt({"type": "transcript", "text": ctl.get("text", "")})
+                    elif ctl.get("type") == "ui_click":
+                        asyncio.create_task(self.browser.interact_click(ctl.get("x", 0), ctl.get("y", 0)))
+                    elif ctl.get("type") == "ui_wheel":
+                        asyncio.create_task(self.browser.interact_wheel(ctl.get("dy", 0)))
         except WebSocketDisconnect:
             pass
         finally:
