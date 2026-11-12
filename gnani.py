@@ -94,9 +94,10 @@ class PrismaStream:
         }
         if self.keyterms:
             headers["keyterms"] = json.dumps(self.keyterms, ensure_ascii=True)
-        for task in (self._reader, self._dispatcher):   # avoid duplicates on reconnect
-            if task:
-                task.cancel()
+        # Only stop any stale reader; never cancel the active dispatcher task if reconnect
+        # was triggered by on_event({"type": "stt_closed"}) running inside _dispatch().
+        if self._reader and self._reader is not asyncio.current_task() and not self._reader.done():
+            self._reader.cancel()
         self.ws = await websockets.connect(
             STT_URL,
             additional_headers=headers,
@@ -105,7 +106,8 @@ class PrismaStream:
             ping_timeout=60,
         )
         self._reader = asyncio.create_task(self._read())
-        self._dispatcher = asyncio.create_task(self._dispatch())
+        if not self._dispatcher or self._dispatcher.done():
+            self._dispatcher = asyncio.create_task(self._dispatch())
 
     async def _read(self):
         """Drain the Prisma socket as fast as possible; hand events to the dispatcher queue."""
@@ -127,7 +129,7 @@ class PrismaStream:
                 self._events.put_nowait({"type": "stt_closed"})
 
     async def _dispatch(self):
-        while True:
+        while not self._closed:
             msg = await self._events.get()
             try:
                 await self.on_event(msg)

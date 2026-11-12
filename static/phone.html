@@ -129,7 +129,9 @@ const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'
 
 // ---- audio out: 8 kHz PCM chunks scheduled back to back ----
 function playPcm(buf) {
-  const i16 = new Int16Array(buf);
+  const samples = Math.floor(buf.byteLength / 2);
+  if (!samples) return;
+  const i16 = new Int16Array(buf, 0, samples);
   if (!i16.length) return;
   const ab = ctx.createBuffer(1, i16.length, ttsRate);
   const ch = ab.getChannelData(0);

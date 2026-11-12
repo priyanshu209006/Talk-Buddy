@@ -258,7 +258,13 @@ class Agent:
                 await asyncio.sleep(0.2)
                 self._drain()
             self._drain()
-            await self._turn()
+            try:
+                await self._turn()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("agent turn failed")
+                self.waiting = True
 
     # ------------------------------------------------------------------ turn loop
     async def _turn(self, max_steps: int = 12):

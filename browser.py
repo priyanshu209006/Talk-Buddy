@@ -727,7 +727,8 @@ class Browser:
             do = (st.get("do") or "").lower()
             try:
                 if do == "open":
-                    await self._goto(st["url"], timeout=20000)
+                    url = st["url"]
+                    await self._goto(url, timeout=20000)
                     try:
                         title = (await self.page.title()).lower()
                         if any(w in title for w in ("just a moment", "security check", "checking your browser", "attention required")):
