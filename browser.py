@@ -51,7 +51,9 @@ AUDIO_HOOK_JS = r"""
       if (peak < 0.0005) return;
       const bytes = new Uint8Array(i16.buffer);
       let bin = '';
-      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      for (let i = 0; i < bytes.length; i += 2048) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 2048));
+      }
       window.__dabSendPcm(btoa(bin), ac.sampleRate);
     };
     proc.connect(silent);
@@ -297,6 +299,7 @@ async def shared_browser():
         # Headless is the stable default. HEADLESS=0 runs a real window parked off-screen,
         # which IRCTC accepts, but on this machine Edge sometimes closed that window by itself.
         headless = os.environ.get("HEADLESS", "1") != "0"
+        js_mb = os.environ.get("JS_HEAP_MB", "128" if os.environ.get("RENDER") else "256")
         args = [
             "--no-sandbox",
             "--disable-dev-shm-usage",
@@ -313,7 +316,7 @@ async def shared_browser():
             "--no-zygote",
             "--in-process-gpu",
             "--disable-site-isolation-trials",
-            "--js-flags=--max-old-space-size=64",
+            f"--js-flags=--max-old-space-size={js_mb}",
             "--disk-cache-size=1",
             "--media-cache-size=1",
             "--disable-extensions",
@@ -628,7 +631,7 @@ class Browser:
         except PWTimeout:
             pass
         try:
-            s = await self.page.evaluate(SNAPSHOT_JS)
+            s = await asyncio.wait_for(self.page.evaluate(SNAPSHOT_JS), timeout=6.0)
         except Exception as e:
             return f"(could not read page: {e})"
         # Separate budgets: on many real sites (e.g. NTES) the data lives inside buttons,
@@ -805,13 +808,20 @@ class Browser:
         start = time.monotonic()
         last, stable = -1, 0
         while time.monotonic() - start < max_s:
-            await self.page.wait_for_timeout(150)
+            await asyncio.sleep(0.15)
             now = time.monotonic()
             fresh = sum(1 for t0 in self._inflight.values() if now - t0 < 2.0)
             try:
-                n = await self.page.evaluate(
-                    "() => (document.body ? document.body.innerText.length : 0) + "
-                    "document.querySelectorAll('a,button,input,select').length * 50")
+                rem = max(0.5, max_s - (time.monotonic() - start))
+                n = await asyncio.wait_for(
+                    self.page.evaluate(
+                        "() => (document.body ? document.body.innerText.length : 0) + "
+                        "document.querySelectorAll('a,button,input,select').length * 50"
+                    ),
+                    timeout=min(2.5, rem),
+                )
+            except asyncio.TimeoutError:
+                return
             except Exception:                    # mid-navigation: wait for the new document
                 try:
                     await self.page.wait_for_load_state("domcontentloaded", timeout=8000)

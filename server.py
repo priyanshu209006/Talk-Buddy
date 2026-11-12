@@ -81,15 +81,17 @@ async def _prewarm():
         log.warning("browser prewarm failed: %s", e)
     lines = [agent_mod.GREETING, *agent_mod.ACKS, "बस एक सेकंड, देख रही हूँ…",
              "माफ़ कीजिए, एक सेकंड दिक्कत आ गई। फिर से बोलिए?"]
-    for g, vname in gnani.GUIDE_BY_GENDER.items():
-        for ln in lines:
-            text = gnani.speakable(gnani.fix_self_gender(ln, g))
+    sem = asyncio.Semaphore(3)
+    async def _warm_one(g: str, vname: str, ln: str):
+        text = gnani.speakable(gnani.fix_self_gender(ln, g))
+        async with sem:
             try:
                 async for _ in cached_tts(text, "guide", vname):
                     pass
             except Exception as e:
                 log.warning("tts prewarm failed: %s", e)
-                return
+    default_g = gnani.voice_gender(gnani.VOICES["guide"]["voice"])
+    await asyncio.gather(*(_warm_one(default_g, gnani.GUIDE_BY_GENDER[default_g], ln) for ln in lines))
     log.info("tts cache warm: %d lines", len(_TTS_CACHE))
 
 

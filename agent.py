@@ -428,18 +428,18 @@ class Agent:
                 # Talk while the browser works: don't wait for the line to finish.
                 asyncio.create_task(self.call.speak(narration, "guide"))
             try:
-                return await self._browse(name, a)
+                return await asyncio.wait_for(self._browse(name, a), timeout=35.0)
             except Exception as e:
-                if "has been closed" not in str(e) and b.alive():
+                if "has been closed" not in str(e) and b.alive() and not isinstance(e, asyncio.TimeoutError):
                     raise
-                # The browser process died: relaunch, restore the page, retry once.
-                last_url = getattr(b, "last_url", None)
+                # The browser process died or stalled: relaunch, restore the page, retry once.
+                last_url = getattr(b, "last_url", None) or (b.page.url if getattr(b, "page", None) else None)
                 await b.restart(last_url)
                 if name in ("click", "fill_form", "type_and_submit", "browse"):
                     # element ids belong to the dead page; hand back a fresh snapshot instead
                     return ("The browser restarted; element ids changed. Fresh page:\n"
                             + await b.snapshot()), False
-                return await self._browse(name, a)
+                return await asyncio.wait_for(self._browse(name, a), timeout=35.0)
         except Exception as e:
             log.warning("tool %s failed: %s", name, e)
             try:
