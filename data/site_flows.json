@@ -287,5 +287,47 @@
     }
    ]
   }
+ ],
+ "www.pvrcinemas.com": [
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.pvrcinemas.com/"
+    },
+    {
+     "do": "type",
+     "target": "Cities",
+     "text": "Bhubaneswar",
+     "pick": true
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.pvrcinemas.com/"
+    },
+    {
+     "do": "type",
+     "target": "Cities",
+     "text": "Bhubaneswar",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Book"
+    },
+    {
+     "do": "wait_for",
+     "text": "RAMAYANA"
+    },
+    {
+     "do": "wait_for",
+     "text": "PVR"
+    }
+   ]
+  }
  ]
 }

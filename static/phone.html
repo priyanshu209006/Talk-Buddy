@@ -3,30 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Talk Buddy · Live AI Voice Browser</title>
+<title>Talk Buddy</title>
 <style>
   :root {
-    --bg: #0b0d12;
-    --panel: #131722;
-    --panel-header: #1a1f2e;
-    --card: #1c2230;
-    --line: #262e40;
-    --text: #e8ecf5;
-    --muted: #8b95a8;
-    --guide: #4fd1a5;
-    --guide-glow: rgba(79, 209, 165, 0.25);
-    --site: #f5b74a;
-    --caller: #5b8cff;
-    --danger: #ff5252;
-    --lcd-bg: #b9c7a3;
-    --lcd-txt: #1c2617;
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-header: #1c2128;
+    --card: #21262d;
+    --line: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #2ea043;
+    --accent-hover: #3fb950;
+    --danger: #da3633;
+    --danger-hover: #f85149;
+    --caller: #58a6ff;
+    --lcd-bg: #9ea792;
+    --lcd-txt: #151a12;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
     min-height: 100vh;
   }
 
@@ -34,255 +34,374 @@
   header.app-header {
     background: var(--panel);
     border-bottom: 1px solid var(--line);
-    padding: 10px 20px;
+    padding: 8px 18px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 16px;
   }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: 0.04em; }
-  .brand-badge { background: linear-gradient(135deg, #4fd1a5, #22a35a); color: #0b0d12; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 800; }
-  .header-badges { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); }
-  .pill { background: var(--card); border: 1px solid var(--line); padding: 3px 10px; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; }
-  .pill.live { border-color: var(--guide); color: var(--guide); }
-  .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
-  .pulse-dot.on { background: var(--guide); box-shadow: 0 0 10px var(--guide); animation: pulse 1.6s infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.15); } }
+  .brand {
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .status-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .status-dot.active {
+    background: var(--accent);
+  }
 
-  /* App Layout */
+  /* Layout */
   .wrap {
     display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 18px;
-    max-width: 1540px;
+    grid-template-columns: 300px 1fr;
+    gap: 16px;
+    max-width: 1500px;
     margin: 0 auto;
-    padding: 16px 18px;
+    padding: 16px;
   }
-  @media(max-width: 980px) { .wrap { grid-template-columns: 1fr; } }
+  @media(max-width: 960px) { .wrap { grid-template-columns: 1fr; } }
 
-  /* Phone Simulator Section */
-  .phone-sec { display: flex; flex-direction: column; gap: 12px; }
+  /* Phone Interface */
+  .phone-sec { display: flex; flex-direction: column; gap: 10px; }
   .phone {
-    background: linear-gradient(165deg, #2c3240, #141720);
-    border: 1px solid #3d465c;
-    border-radius: 36px;
-    padding: 20px 18px 24px;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.15);
+    background: #161b22;
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    padding: 16px 14px 20px;
+    box-shadow: 0 16px 36px rgba(0,0,0,0.4);
     width: 100%;
-    max-width: 310px;
+    max-width: 300px;
     margin: 0 auto;
   }
-  .speaker-slit { width: 64px; height: 5px; border-radius: 3px; background: #0c0e14; margin: 0 auto 12px; border: 1px solid #363d50; }
+  .speaker-slit {
+    width: 48px;
+    height: 4px;
+    border-radius: 2px;
+    background: #0d1117;
+    margin: 0 auto 12px;
+  }
   
-  /* Retro-Modern LCD Screen */
+  /* Monospace LCD */
   .lcd {
     background: var(--lcd-bg);
     color: var(--lcd-txt);
-    border-radius: 10px;
-    height: 240px;
-    padding: 10px 12px;
-    font-family: "Courier New", Courier, monospace;
-    box-shadow: inset 0 3px 8px rgba(0,0,0,0.45), 0 1px 2px rgba(255,255,255,0.2);
+    border-radius: 6px;
+    height: 220px;
+    padding: 8px 10px;
+    font-family: "SF Mono", "JetBrains Mono", Consolas, Menlo, monospace;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    position: relative;
   }
-  .lcd .top { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; border-bottom: 1px solid rgba(28, 38, 23, 0.25); padding-bottom: 4px; }
-  .lcd .who { font-weight: 900; font-size: 15px; margin: 6px 0 2px; }
-  .lcd .speech-box { flex: 1; overflow-y: auto; font-size: 12.5px; line-height: 1.35; white-space: pre-wrap; margin-top: 4px; word-break: break-word; }
-  
-  /* Animated LCD sound wave bars */
-  .lcd-waves { display: flex; gap: 3px; align-items: flex-end; height: 16px; margin: 4px 0; }
-  .lcd-waves span { display: block; width: 4px; background: var(--lcd-txt); border-radius: 1px; height: 3px; transition: height 0.08s; }
-
-  /* Dialed digits row */
-  .lcd .digits { font-size: 14px; font-weight: bold; color: #1c2617; letter-spacing: 2px; min-height: 18px; margin-top: 2px; }
-  
-  /* SMS card inside LCD */
+  .lcd .top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(21, 26, 18, 0.2);
+    padding-bottom: 3px;
+  }
+  .lcd .title {
+    font-weight: 700;
+    font-size: 13px;
+    margin: 6px 0 2px;
+  }
+  .lcd .speech-box {
+    flex: 1;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    margin-top: 4px;
+    word-break: break-word;
+  }
+  .lcd .digits {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    min-height: 16px;
+    margin-top: 2px;
+  }
   .lcd .sms {
-    background: #1c2617;
-    color: #b9c7a3;
-    padding: 6px 8px;
-    border-radius: 5px;
-    font-size: 11.5px;
+    background: #151a12;
+    color: #9ea792;
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 11px;
     margin-top: 6px;
     display: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   }
 
-  /* Mic Sound Meter */
-  .meter-box { margin-top: 10px; }
-  .meter { height: 5px; background: #0c0e14; border-radius: 3px; overflow: hidden; border: 1px solid #293040; }
-  .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #4fd1a5, #f5b74a, #ff5252); transition: width 0.08s; }
+  /* Sound Level Meter */
+  .meter-box { margin-top: 8px; }
+  .meter {
+    height: 4px;
+    background: #0d1117;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .meter i {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    transition: width 0.08s;
+  }
 
   /* Call Actions */
-  .callrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .callrow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+  }
   .callrow button {
     border: 0;
-    border-radius: 18px;
-    height: 44px;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    color: #fff;
-    transition: transform 0.1s, box-shadow 0.2s, opacity 0.2s;
-  }
-  .callrow button:active { transform: scale(0.97); }
-  #dial { background: linear-gradient(135deg, #22a35a, #197a43); box-shadow: 0 4px 14px rgba(34,163,90,0.35); }
-  #end { background: linear-gradient(135deg, #e53935, #b71c1c); box-shadow: 0 4px 14px rgba(229,57,53,0.35); }
-  button:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none !important; }
-
-  /* Interactive Keypad */
-  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
-  .keys button {
-    background: linear-gradient(145deg, #384052, #292f3d);
-    color: #e8ecf5;
-    border: 1px solid #434c62;
-    border-radius: 12px;
+    border-radius: 6px;
     height: 38px;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.1s, transform 0.1s;
+    color: #fff;
+    transition: background 0.12s;
+  }
+  #dial { background: var(--accent); }
+  #dial:hover:not(:disabled) { background: var(--accent-hover); }
+  #end { background: var(--danger); }
+  #end:hover:not(:disabled) { background: var(--danger-hover); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* Keypad */
+  .keys {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .keys button {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    height: 34px;
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.1s;
     user-select: none;
   }
-  .keys button:hover { background: #454f66; }
-  .keys button:active { transform: scale(0.94); background: var(--guide); color: #0b0d12; }
+  .keys button:hover { background: #30363d; }
+  .keys button:active { background: #388bfd; color: #fff; }
 
-  /* Quick action buttons on phone */
-  .quick-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+  /* Sub-Actions */
+  .quick-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+  }
   .quick-bar button {
-    background: #1d222e;
+    background: var(--card);
     border: 1px solid var(--line);
     color: var(--text);
-    border-radius: 8px;
+    border-radius: 6px;
     padding: 6px 4px;
     font-size: 11px;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: border-color 0.15s;
   }
-  .quick-bar button:hover { border-color: var(--guide); color: var(--guide); }
+  .quick-bar button:hover { border-color: var(--muted); }
 
-  /* Autonomous Consent Card */
+  /* Consent Alert Box */
   .consent-card {
-    background: linear-gradient(135deg, #1f2736, #141a24);
-    border: 1px solid var(--guide);
-    border-radius: 12px;
-    padding: 12px;
-    margin-top: 12px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 10px var(--guide-glow);
+    background: var(--card);
+    border: 1px solid #388bfd;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 10px;
     display: none;
-    animation: fadeIn 0.25s ease;
   }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-  .consent-title { font-weight: 700; font-size: 12.5px; color: var(--guide); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
-  .consent-desc { font-size: 12px; color: var(--text); margin-bottom: 10px; line-height: 1.4; }
-  .consent-btns { display: flex; gap: 8px; }
+  .consent-title {
+    font-weight: 600;
+    font-size: 12px;
+    color: #58a6ff;
+    margin-bottom: 4px;
+  }
+  .consent-desc {
+    font-size: 11.5px;
+    color: var(--text);
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  .consent-btns { display: flex; gap: 6px; }
   .consent-btns button {
     flex: 1;
-    border: 0;
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 11.5px;
-    font-weight: 700;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 600;
     cursor: pointer;
   }
-  .btn-allow { background: var(--guide); color: #0b0d12; }
-  .btn-deny { background: #2b3240; color: var(--text); }
+  .btn-allow { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-deny { background: var(--panel); color: var(--text); }
 
-  /* Browser Stage */
-  .stage { display: grid; grid-template-rows: auto 1fr; gap: 14px; min-width: 0; }
+  /* Side Options */
+  .side-opts {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .side-opts label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .side-opts input[type=text] {
+    width: 100%;
+    background: #0d1117;
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 6px 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    outline: none;
+  }
+  .side-opts input[type=text]:focus { border-color: #58a6ff; }
+
+  /* Browser Viewport Stage */
+  .stage {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 14px;
+    min-width: 0;
+  }
   .browser-screen {
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 14px;
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
     display: flex;
     flex-direction: column;
   }
 
-  /* Browser Nav Header */
+  /* Browser Bar */
   .browser-bar {
     background: var(--panel-header);
     border-bottom: 1px solid var(--line);
-    padding: 8px 12px;
+    padding: 6px 10px;
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 12.5px;
+    font-size: 12px;
   }
   .nav-group { display: flex; gap: 4px; }
   .nav-btn {
     background: var(--card);
     border: 1px solid var(--line);
     color: var(--text);
-    border-radius: 6px;
-    width: 28px;
-    height: 28px;
+    border-radius: 4px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     font-size: 12px;
-    transition: background 0.15s, border-color 0.15s;
+    font-family: inherit;
+    transition: border-color 0.12s;
   }
   .nav-btn:hover { border-color: var(--muted); }
   .url-wrap {
     flex: 1;
     display: flex;
     align-items: center;
-    background: #0c0e14;
+    background: #0d1117;
     border: 1px solid var(--line);
-    border-radius: 7px;
-    padding: 2px 8px;
+    border-radius: 5px;
+    padding: 3px 8px;
     gap: 6px;
     min-width: 0;
   }
-  .url-icon { opacity: 0.6; font-size: 11px; }
   #urlInput {
     flex: 1;
     background: transparent;
     border: 0;
     color: var(--text);
-    font: 12px/1.4 system-ui, sans-serif;
+    font: 12px/1.3 "SF Mono", Consolas, monospace;
     outline: none;
     min-width: 0;
   }
   .url-go-btn {
     background: transparent;
     border: 0;
-    color: var(--guide);
-    font-weight: 700;
-    cursor: pointer;
+    color: var(--accent-hover);
+    font-weight: 600;
     font-size: 11px;
-    padding: 2px 4px;
+    cursor: pointer;
+    padding: 0 4px;
   }
-  .bar-tools { display: flex; align-items: center; gap: 8px; }
+  .bar-tools { display: flex; align-items: center; gap: 6px; }
   .tool-btn {
     background: var(--card);
     border: 1px solid var(--line);
     color: var(--text);
-    border-radius: 6px;
-    padding: 4px 9px;
-    font-size: 11.5px;
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
     cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+    font-family: inherit;
+    transition: border-color 0.12s;
   }
-  .tool-btn.active { border-color: var(--guide); color: var(--guide); }
+  .tool-btn.active { border-color: var(--accent); color: var(--accent-hover); }
   .tool-btn.muted { opacity: 0.55; color: var(--muted); }
+  .live-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #1c261e;
+    color: var(--accent-hover);
+    border: 1px solid rgba(46,160,67,0.4);
+  }
 
-  /* Viewport Image Area */
+  /* Viewport Media Container */
   .viewport-wrap {
     position: relative;
-    background: #08090d;
+    background: #05070a;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 440px;
+    min-height: 420px;
     overflow: hidden;
   }
   #shot {
@@ -290,98 +409,123 @@
     width: 100%;
     aspect-ratio: 16 / 10;
     object-fit: contain;
-    background: #08090d;
+    background: #05070a;
     color: transparent;
     cursor: crosshair;
   }
   #shot:not([src]) { visibility: hidden; }
 
-  /* Ripple click effect */
+  /* Visual Click Ripple */
   .click-ripple {
     position: absolute;
-    width: 26px;
-    height: 26px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    background: rgba(79, 209, 165, 0.45);
-    border: 2px solid #4fd1a5;
+    border: 2px solid var(--accent);
     pointer-events: none;
     transform: translate(-50%, -50%) scale(0.5);
-    animation: ripple 0.4s ease-out forwards;
+    animation: ripple 0.35s ease-out forwards;
     z-index: 10;
   }
   @keyframes ripple {
     to { transform: translate(-50%, -50%) scale(2); opacity: 0; }
   }
 
-  /* Fullscreen Viewport Mode */
+  /* Fullscreen Mode */
   .stage.fullscreen {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     z-index: 9999;
     background: #000;
-    padding: 10px;
+    padding: 0;
   }
-  .stage.fullscreen .browser-screen { height: 100%; border-radius: 0; }
+  .stage.fullscreen .browser-screen { height: 100%; border-radius: 0; border: 0; }
   .stage.fullscreen .viewport-wrap { flex: 1; min-height: 0; }
   .stage.fullscreen #shot { aspect-ratio: auto; height: 100%; }
 
-  /* Lower Dual Workspace */
-  .cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; min-height: 0; }
+  /* Columns */
+  .cols {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 14px;
+    min-height: 0;
+  }
   @media(max-width: 1050px) { .cols { grid-template-columns: 1fr; } }
   .box {
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 14px;
+    border-radius: 8px;
+    padding: 12px;
     overflow-y: auto;
     max-height: 380px;
     display: flex;
     flex-direction: column;
   }
-  .box-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; display: flex; justify-content: space-between; }
-
-  /* Conversation Messages */
-  .msg {
-    margin: 0 0 9px;
-    padding: 9px 12px;
-    border-radius: 9px;
-    border-left: 3px solid;
-    background: #171c26;
-    animation: fadeIn 0.2s ease;
+  .box-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
-  .msg-head { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; }
-  .msg.guide { border-color: var(--guide); }
-  .msg.guide .msg-author { color: var(--guide); font-weight: 700; }
+
+  /* Messages */
+  .msg {
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border-left: 3px solid;
+    background: #1c2128;
+    font-size: 12.5px;
+  }
+  .msg-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    margin-bottom: 2px;
+  }
+  .msg.guide { border-color: var(--accent); }
+  .msg.guide .msg-author { color: var(--accent-hover); font-weight: 600; }
   .msg.caller { border-color: var(--caller); }
-  .msg.caller .msg-author { color: var(--caller); font-weight: 700; }
-  .msg.site { border-color: var(--site); font-family: Consolas, monospace; }
-  .msg.cut { opacity: 0.55; text-decoration: line-through; }
+  .msg.caller .msg-author { color: var(--caller); font-weight: 600; }
+  .msg.cut { opacity: 0.5; text-decoration: line-through; }
   .msg.ignored { opacity: 0.45; font-style: italic; border-left-style: dashed; }
 
   /* Activity Log */
-  .log-entry { font-family: Consolas, Monaco, monospace; font-size: 11.5px; padding: 4px 0; border-bottom: 1px dashed var(--line); color: var(--muted); word-break: break-word; }
+  .log-entry {
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 11.5px;
+    padding: 3px 0;
+    border-bottom: 1px solid #21262d;
+    color: var(--muted);
+    word-break: break-word;
+  }
   .log-entry b { color: var(--text); }
-  .action-badge {
-    background: #1f2738;
-    color: var(--site);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 700;
-    margin-right: 6px;
+  .action-tag {
+    background: #21262d;
+    color: #e6edf3;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10.5px;
+    margin-right: 4px;
+    border: 1px solid var(--line);
   }
 </style>
 </head>
 <body>
 
 <header class="app-header">
-  <div class="brand">
-    <span>🌐 Talk Buddy</span>
-    <span class="brand-badge">AI BROWSER 2.0</span>
-  </div>
-  <div class="header-badges">
-    <span class="pill" id="ratePill">🎙️ HD 48 kHz / 16 kHz</span>
-    <span class="pill" id="statusPill"><i class="pulse-dot" id="headerDot"></i> <span id="statusTxt">Ready to Call</span></span>
+  <div class="brand">Talk Buddy</div>
+  <div class="header-meta">
+    <span id="rateLabel">48 kHz / 16 kHz</span>
+    <span class="status-tag">
+      <span class="status-dot" id="headerDot"></span>
+      <span id="statusTxt">Ready</span>
+    </span>
   </div>
 </header>
 
@@ -392,16 +536,13 @@
       <div class="speaker-slit"></div>
       <div class="lcd">
         <div class="top">
-          <span id="sig">▂▄▆ 5G</span>
-          <span id="volte">VoLTE HD</span>
+          <span>5G</span>
+          <span>HD</span>
           <span id="timer">00:00</span>
         </div>
-        <div class="who" id="who">Dial-a-Browser</div>
-        <div class="lcd-waves" id="lcdWaves">
-          <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-        </div>
+        <div class="title" id="who">Dial-a-Browser</div>
         <div class="digits" id="digits"></div>
-        <div class="speech-box" id="last">Press green to start call.</div>
+        <div class="speech-box" id="last">Ready. Press Call to start.</div>
         <div class="sms" id="sms"></div>
       </div>
 
@@ -410,7 +551,7 @@
       </div>
 
       <div class="callrow">
-        <button id="dial">📞 Call</button>
+        <button id="dial">Call</button>
         <button id="end" disabled>End</button>
       </div>
 
@@ -422,26 +563,26 @@
       </div>
 
       <div class="quick-bar">
-        <button id="quickLoginBtn" title="Instruct agent to handle login on the active page">🔑 Ask to Log In</button>
-        <button id="quickSkipAdBtn" title="Autonomously click Skip Ad on video">⏭️ Skip Ad</button>
+        <button id="quickLoginBtn" title="Request login handling on current page">Sign In</button>
+        <button id="quickSkipAdBtn" title="Skip video advertisement">Skip Ad</button>
       </div>
     </div>
 
-    <!-- Autonomy / Consent Action Card -->
+    <!-- Autonomous Consent Card -->
     <div class="consent-card" id="consentCard">
-      <div class="consent-title"><span>🛡️</span> <span id="consentTitle">Action Requires Permission</span></div>
-      <div class="consent-desc" id="consentDesc">Website is asking to sign in. Allow Talk Buddy to log in for you?</div>
+      <div class="consent-title" id="consentTitle">Authentication Required</div>
+      <div class="consent-desc" id="consentDesc">Website requires sign-in. Proceed with login?</div>
       <div class="consent-btns">
-        <button class="btn-allow" id="consentAllowBtn">✅ Yes, Log In</button>
-        <button class="btn-deny" id="consentDenyBtn">❌ Continue</button>
+        <button class="btn-allow" id="consentAllowBtn">Log In</button>
+        <button class="btn-deny" id="consentDenyBtn">Cancel</button>
       </div>
     </div>
 
-    <div style="background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:8px;">
-      <label style="display:flex; align-items:center; gap:6px;">
+    <div class="side-opts">
+      <label>
         <input type="checkbox" id="barge" checked> Duplex voice (barge-in enabled)
       </label>
-      <input type="text" id="typed" placeholder="(debug) type message & press Enter" style="width:100%; background:#0c0e14; border:1px solid var(--line); color:var(--text); padding:6px; border-radius:5px; font-size:12px;">
+      <input type="text" id="typed" placeholder="Type message and press Enter">
     </div>
   </section>
 
@@ -450,19 +591,18 @@
     <div class="browser-screen">
       <div class="browser-bar">
         <div class="nav-group">
-          <button class="nav-btn" id="navBack" title="Back">◀</button>
-          <button class="nav-btn" id="navFwd" title="Forward">▶</button>
-          <button class="nav-btn" id="navReload" title="Reload">⟳</button>
+          <button class="nav-btn" id="navBack" title="Back">&larr;</button>
+          <button class="nav-btn" id="navFwd" title="Forward">&rarr;</button>
+          <button class="nav-btn" id="navReload" title="Reload">&#8635;</button>
         </div>
         <div class="url-wrap">
-          <span class="url-icon">🔒</span>
-          <input type="text" id="urlInput" value="Browser idle" placeholder="Enter URL or search...">
-          <button class="url-go-btn" id="urlGo">Go ➔</button>
+          <input type="text" id="urlInput" value="Ready" placeholder="Enter URL...">
+          <button class="url-go-btn" id="urlGo">Go</button>
         </div>
         <div class="bar-tools">
-          <button class="tool-btn" id="pageAudioBtn" title="Toggle and unmute video/page audio">🔊 Audio</button>
-          <button class="tool-btn" id="fullscreenBtn" title="Expand screen to fullscreen">⛶</button>
-          <span class="pill live" style="padding: 2px 7px; font-size: 11px;"><i class="pulse-dot on" id="liveDot"></i> <span id="liveTxt">LIVE</span></span>
+          <button class="tool-btn active" id="pageAudioBtn">Audio</button>
+          <button class="tool-btn" id="fullscreenBtn">Fullscreen</button>
+          <span class="live-badge">LIVE</span>
         </div>
       </div>
       <div class="viewport-wrap" id="viewportWrap">
@@ -474,8 +614,8 @@
       <!-- Conversation Column -->
       <div class="box" id="convo">
         <div class="box-title">
-          <span>Live Conversation</span>
-          <span style="font-size:11px; text-transform:none;">Caller &bull; Assistant</span>
+          <span>Conversation</span>
+          <span style="font-size:10px; text-transform:none;">Caller / Assistant</span>
         </div>
         <div id="convoList"></div>
       </div>
@@ -483,8 +623,8 @@
       <!-- Agent Activity Log -->
       <div class="box" id="logBox">
         <div class="box-title">
-          <span>Agent Activity & Trail</span>
-          <button id="clearLogBtn" style="background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:11px;">Clear</button>
+          <span>Activity Log</span>
+          <button id="clearLogBtn" style="background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:10.5px;">Clear</button>
         </div>
         <div id="logList"></div>
       </div>
@@ -524,24 +664,7 @@ function log(html) {
 }
 const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
-// Visualizer waves animation on LCD
-function setLcdWaves(active) {
-  const bars = $('lcdWaves').querySelectorAll('span');
-  bars.forEach((b, i) => {
-    b.style.height = active ? `${Math.floor(4 + Math.random() * 12)}px` : '3px';
-  });
-}
-let waveInterval = null;
-function toggleWavePulse(on) {
-  clearInterval(waveInterval);
-  if (on) {
-    waveInterval = setInterval(() => setLcdWaves(true), 90);
-  } else {
-    setLcdWaves(false);
-  }
-}
-
-// ---- DTMF Dialtone Generator using Web Audio ----
+// ---- DTMF Tone Synthesis ----
 function playDtmfTone(char) {
   if (!ctx) return;
   const dtmfFrequencies = {
@@ -557,20 +680,20 @@ function playDtmfTone(char) {
   const toneGain = ctx.createGain();
   osc1.frequency.value = freqs[0];
   osc2.frequency.value = freqs[1];
-  toneGain.gain.setValueAtTime(0.08, ctx.currentTime);
-  toneGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+  toneGain.gain.setValueAtTime(0.06, ctx.currentTime);
+  toneGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
   osc1.connect(toneGain);
   osc2.connect(toneGain);
   toneGain.connect(ctx.destination);
   osc1.start();
   osc2.start();
-  osc1.stop(ctx.currentTime + 0.13);
-  osc2.stop(ctx.currentTime + 0.13);
+  osc1.stop(ctx.currentTime + 0.11);
+  osc2.stop(ctx.currentTime + 0.11);
 }
 
-// ---- Jitter-Free Audio Playback Engine ----
+// ---- Audio Jitter Buffer & Playback ----
 
-// Assistant Speech: smooth gapless scheduling with micro-fades
+// Assistant Speech: gapless scheduling with micro-fades
 function playPcm(buf) {
   if (!ctx || !outGain) return;
   const samples = Math.floor(buf.byteLength / 2);
@@ -580,7 +703,7 @@ function playPcm(buf) {
   const ch = ab.getChannelData(0);
   for (let i = 0; i < samples; i++) ch[i] = i16[i] / 32768;
 
-  // Boundary smoothing: 16-sample micro ramp on start/end to prevent DC pop
+  // Boundary micro-ramp: prevents DC pop at chunk edges
   const fade = Math.min(16, Math.floor(samples / 2));
   for (let i = 0; i < fade; i++) {
     const f = i / fade;
@@ -593,7 +716,6 @@ function playPcm(buf) {
   src.connect(outGain);
 
   const now = ctx.currentTime;
-  // If buffer underran or newly starting, provide an 80ms runway to absorb network arrival jitter
   if (playHead < now) {
     playHead = now + 0.08;
   }
@@ -601,12 +723,10 @@ function playPcm(buf) {
   playHead += ab.duration;
 
   sources.push(src);
-  toggleWavePulse(true);
   updateMute();
 
   src.onended = () => {
     sources = sources.filter(s => s !== src);
-    if (sources.length === 0) toggleWavePulse(false);
     updateMute();
   };
 }
@@ -615,7 +735,6 @@ function clearAudio() {
   sources.forEach(s => { try { s.stop(); } catch {} });
   sources = [];
   playHead = 0;
-  toggleWavePulse(false);
   if (lastSay) lastSay.classList.add('cut');
   duck(false);
   updateMute();
@@ -628,12 +747,11 @@ function duck(on) {
   outGain.gain.setTargetAtTime(on ? 0.25 : 1.0, t, on ? 0.04 : 0.12);
 }
 
-// Media Audio: smooth Jitter Buffer for YouTube/Video playback
+// Media Audio: Jitter Buffer for YouTube/Video playback
 function syncMediaGain(force) {
   if (!mediaGain || !ctx) return;
   const isSpeaking = sources.length > 0;
   const target = !pageAudioOn ? 0.0 : (isSpeaking ? 0.18 : 0.95);
-  // Never hammer gain if already at target: prevents clicking/zipper distortion
   if (!force && Math.abs(currentMediaTarget - target) < 0.02) return;
   currentMediaTarget = target;
   const t = ctx.currentTime;
@@ -654,7 +772,6 @@ function playMediaPcm(b64, rate) {
     const ch = ab.getChannelData(0);
     for (let i = 0; i < samples; i++) ch[i] = i16[i] / 32768;
 
-    // Micro-fade boundaries to prevent clicks
     const fade = Math.min(16, Math.floor(samples / 2));
     for (let i = 0; i < fade; i++) {
       const f = i / fade;
@@ -667,12 +784,9 @@ function playMediaPcm(b64, rate) {
     src.connect(mediaGain);
 
     const now = ctx.currentTime;
-    // Jitter Buffer logic: maintain 100-120ms safety cushion
     if (mediaHead < now) {
-      // Underrun occurred: restart with cushion
       mediaHead = now + 0.10;
     } else if (mediaHead - now > 0.45) {
-      // Backlog accumulated (e.g. background tab): gently resync
       mediaHead = now + 0.12;
     }
     src.start(mediaHead);
@@ -682,7 +796,7 @@ function playMediaPcm(b64, rate) {
   }
 }
 
-// Viewport Frame Scheduler
+// Frame Scheduler
 function scheduleScreen(m) {
   pendingScreen = m;
   if (rafScreen) return;
@@ -692,7 +806,7 @@ function scheduleScreen(m) {
     pendingScreen = null;
     if (!f) return;
     $('shot').src = 'data:image/jpeg;base64,' + f.jpeg;
-    $('urlInput').value = f.url || 'Dial-a-Browser';
+    $('urlInput').value = f.url || '';
   });
 }
 
@@ -703,7 +817,7 @@ function updateMute() {
   worklet.port.postMessage({ muted: talking && !$('barge').checked });
 }
 
-// ---- Start Call ----
+// ---- Call Lifecycle ----
 async function startCall() {
   $('dial').disabled = true;
   try {
@@ -742,7 +856,7 @@ async function startCall() {
     })();
   } catch (err) {
     micStream = null; worklet = null;
-    log('<b>no microphone</b> (' + esc(err.message) + '). Typed mode active.');
+    log('Microphone unavailable: ' + esc(err.message));
   }
 
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/call`);
@@ -752,14 +866,14 @@ async function startCall() {
     if (worklet) worklet.port.onmessage = e => { if (ws && ws.readyState === 1) ws.send(e.data); };
     ws.send(JSON.stringify({ type: 'barge_in', enabled: $('barge').checked }));
     $('end').disabled = false;
-    $('headerDot').classList.add('on');
-    $('statusTxt').textContent = 'Connected (Live Call)';
+    $('headerDot').classList.add('active');
+    $('statusTxt').textContent = 'Connected';
     t0 = Date.now();
     timerId = setInterval(() => {
       const s = Math.floor((Date.now() - t0) / 1000);
       $('timer').textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
     }, 500);
-    $('last').textContent = 'Calling…';
+    $('last').textContent = 'Connecting...';
   };
 
   ws.onmessage = e => {
@@ -770,30 +884,29 @@ async function startCall() {
         case 'say':
           lastSay = addMsg('guide', 'Assistant', m.text);
           $('last').textContent = m.text;
-          // Autonomous check: if assistant asks about login, prompt consent card
           if (/login|sign in|लॉगिन|खाता|पासवर्ड/i.test(m.text)) {
-            showConsent("Website Sign-In Required", m.text, "Yes, please log in for me", "No, continue without logging in");
+            showConsent("Authentication Required", m.text, "Log In", "Cancel");
           }
           break;
         case 'config':
           if (m.stt_rate) sttRate = m.stt_rate;
           if (m.tts_rate) ttsRate = m.tts_rate;
-          $('ratePill').textContent = `🎙️ HD ${ttsRate / 1000}k / ${sttRate / 1000}k`;
+          $('rateLabel').textContent = `${ttsRate / 1000} kHz / ${sttRate / 1000} kHz`;
           break;
         case 'pong':
           break;
         case 'heard': {
-          const label = `Caller${m.lang ? ' · ' + m.lang : ''}${m.latency ? ' · ' + m.latency + ' ms' : ''}` +
-            (m.ignored ? ` · ignored: ${m.ignored.toLowerCase().replace('_', ' ')}` : '');
+          const label = `Caller${m.lang ? ' / ' + m.lang : ''}${m.latency ? ' / ' + m.latency + 'ms' : ''}` +
+            (m.ignored ? ` (ignored: ${m.ignored.toLowerCase().replace('_', ' ')})` : '');
           const d = addMsg('caller', label, m.text);
           if (m.ignored) d.classList.add('ignored');
           break;
         }
         case 'duck': duck(m.on); break;
-        case 'clear_audio': clearAudio(); log('<b>barge-in</b> audio interrupted'); break;
+        case 'clear_audio': clearAudio(); log('Barge-in: speech interrupted'); break;
         case 'action':
           if (m.name !== 'say') {
-            log(`<span class="action-badge">${esc(m.name)}</span> ${esc(JSON.stringify(m.args))}`);
+            log(`<span class="action-tag">${esc(m.name)}</span> ${esc(JSON.stringify(m.args))}`);
           }
           break;
         case 'screen':
@@ -804,11 +917,11 @@ async function startCall() {
           break;
         case 'sms':
           $('sms').style.display = 'block';
-          $('sms').innerHTML = `✉ SMS: <b>${esc(m.text)}</b>`;
-          log('<b>✉ SMS Received:</b> ' + esc(m.text));
+          $('sms').innerHTML = `SMS: <b>${esc(m.text)}</b>`;
+          log('SMS received: ' + esc(m.text));
           break;
         case 'status':
-          log('<b>status</b> ' + esc(m.text));
+          log('Status: ' + esc(m.text));
           $('statusTxt').textContent = m.text;
           break;
         case 'log': log(esc(m.text)); break;
@@ -820,10 +933,10 @@ async function startCall() {
   };
 
   ws.onclose = e => {
-    log(`<b>Call ended</b>${e.reason ? ' (' + esc(e.reason) + ')' : ''}`);
+    log(`Call ended${e.reason ? ' (' + esc(e.reason) + ')' : ''}`);
     endCall();
   };
-  ws.onerror = () => { log(`<b>Connection error</b>`); };
+  ws.onerror = () => { log('Connection error'); };
 }
 
 setInterval(() => {
@@ -834,7 +947,6 @@ function endCall() {
   if (ws && ws.readyState <= 1) ws.close();
   ws = null;
   clearInterval(timerId);
-  toggleWavePulse(false);
   if (micStream) micStream.getTracks().forEach(t => t.stop());
   setTimeout(() => {
     if (ctx) { ctx.close(); ctx = null; }
@@ -846,20 +958,19 @@ function endCall() {
   playHead = 0;
   $('dial').disabled = false;
   $('end').disabled = true;
-  $('headerDot').classList.remove('on');
-  $('statusTxt').textContent = 'Call Ended';
-  $('last').textContent = 'Call ended. Press green to call again.';
+  $('headerDot').classList.remove('active');
+  $('statusTxt').textContent = 'Ready';
+  $('last').textContent = 'Call ended.';
   $('digits').textContent = '';
   dialedNumbers = '';
   $('consentCard').style.display = 'none';
 }
 
-// Consent Card helper
 function showConsent(title, desc, allowText, denyText) {
   $('consentTitle').textContent = title;
   $('consentDesc').textContent = desc;
-  $('consentAllowBtn').textContent = allowText || "✅ Allow / Yes";
-  $('consentDenyBtn').textContent = denyText || "❌ Deny / Skip";
+  $('consentAllowBtn').textContent = allowText || "Log In";
+  $('consentDenyBtn').textContent = denyText || "Cancel";
   $('consentCard').style.display = 'block';
 }
 
@@ -876,7 +987,7 @@ $('consentDenyBtn').onclick = () => {
   }
 };
 
-// ---- Keypad & DTMF Handler ----
+// Keypad DTMF
 document.querySelectorAll('.keys button').forEach(btn => {
   btn.onclick = () => {
     const k = btn.dataset.key;
@@ -900,11 +1011,11 @@ $('quickLoginBtn').onclick = () => {
 $('quickSkipAdBtn').onclick = () => {
   if (ws && ws.readyState === 1) {
     ws.send(JSON.stringify({ type: 'skip_ad' }));
-    log('<b>Autonomous Action:</b> Skip Ad triggered');
+    log('Action: Skip Ad');
   }
 };
 
-// Browser Navigation Buttons
+// Navigation
 $('navBack').onclick = () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'nav_back' })); };
 $('navFwd').onclick = () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'nav_forward' })); };
 $('navReload').onclick = () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'nav_reload' })); };
@@ -917,35 +1028,34 @@ $('urlGo').onclick = () => {
 };
 $('urlInput').onkeydown = e => { if (e.key === 'Enter') $('urlGo').click(); };
 
-// Page Audio Mute Toggle
+// Audio Mute Toggle
 $('pageAudioBtn').onclick = () => {
   pageAudioOn = !pageAudioOn;
   $('pageAudioBtn').classList.toggle('muted', !pageAudioOn);
   $('pageAudioBtn').classList.toggle('active', pageAudioOn);
-  $('pageAudioBtn').textContent = pageAudioOn ? '🔊 Audio' : '🔇 Muted';
+  $('pageAudioBtn').textContent = pageAudioOn ? 'Audio' : 'Muted';
   syncMediaGain(true);
 };
 
-// Fullscreen Expand Toggle
+// Fullscreen Toggle
 $('fullscreenBtn').onclick = () => {
   const isFull = $('stage').classList.toggle('fullscreen');
-  $('fullscreenBtn').textContent = isFull ? '✕' : '⛶';
+  $('fullscreenBtn').textContent = isFull ? 'Restore' : 'Fullscreen';
 };
 
-// Direct Interaction: Clicks & Wheel on Screen
+// Direct Screen Click & Wheel
 $('shot').addEventListener('click', e => {
   if (!ws || ws.readyState !== 1) return;
   const img = $('shot');
   const rect = img.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
 
-  // Add click ripple animation
   const ripple = document.createElement('div');
   ripple.className = 'click-ripple';
   ripple.style.left = `${e.clientX - rect.left}px`;
   ripple.style.top = `${e.clientY - rect.top}px`;
   $('viewportWrap').appendChild(ripple);
-  setTimeout(() => ripple.remove(), 450);
+  setTimeout(() => ripple.remove(), 350);
 
   const natRatio = (img.naturalWidth && img.naturalHeight) ? (img.naturalWidth / img.naturalHeight) : (16 / 10);
   const boxRatio = rect.width / rect.height;
@@ -970,8 +1080,8 @@ $('shot').addEventListener('wheel', e => {
   ws.send(JSON.stringify({ type: 'ui_wheel', dy: e.deltaY }));
 }, { passive: false });
 
-// Controls
-$('dial').onclick = () => startCall().catch(err => { log('error: ' + esc(err.message)); $('dial').disabled = false; });
+// Form Controls
+$('dial').onclick = () => startCall().catch(err => { log('Error: ' + esc(err.message)); $('dial').disabled = false; });
 $('end').onclick = endCall;
 $('barge').onchange = () => {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'barge_in', enabled: $('barge').checked }));
