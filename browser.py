@@ -127,15 +127,85 @@ AUDIO_HOOK_JS = r"""
 # refer to, and return a compact text rendering of what a sighted user would see.
 STEALTH_JS = r"""
 (() => {
+  // Preserve native toString representation for wrapped functions
+  const origToString = Function.prototype.toString;
+  const nativeMap = new WeakMap();
+  function markNative(fn, name) {
+    nativeMap.set(fn, `function ${name}() { [native code] }`);
+  }
+  Function.prototype.toString = function() {
+    if (nativeMap.has(this)) return nativeMap.get(this);
+    return origToString.apply(this, arguments);
+  };
+  markNative(Function.prototype.toString, 'toString');
+
+  // Plugins & MimeTypes: realistic PluginArray & MimeTypeArray with native prototype inheritance
   try {
-    delete Object.getPrototypeOf(navigator).webdriver;
-    Object.defineProperty(navigator, 'webdriver', {
-      get: () => undefined,
-      configurable: true,
+    const pluginData = [
+      { name: 'PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+      { name: 'Chrome PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+      { name: 'Chromium PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+      { name: 'Microsoft Edge PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+      { name: 'WebKit built-in PDF', filename: 'internal-pdf-viewer', description: 'Portable Document Format' }
+    ];
+    const mimeData = [
+      { type: 'application/pdf', suffixes: 'pdf', description: 'Portable Document Format' },
+      { type: 'text/pdf', suffixes: 'pdf', description: 'Portable Document Format' }
+    ];
+    const p = Object.create(PluginArray.prototype);
+    const m = Object.create(MimeTypeArray.prototype);
+    const plugins = [];
+    const mimes = [];
+
+    mimeData.forEach(md => {
+      const mime = Object.create(MimeType.prototype);
+      for (const [k, v] of Object.entries(md)) {
+        Object.defineProperty(mime, k, { value: v, enumerable: true });
+      }
+      mimes.push(mime);
+      Object.defineProperty(m, md.type, { value: mime, enumerable: true });
     });
+    Object.defineProperty(m, 'length', { value: mimes.length });
+    m.item = function item(index) { return mimes[index] || null; };
+    m.namedItem = function namedItem(name) { return m[name] || null; };
+    markNative(m.item, 'item');
+    markNative(m.namedItem, 'namedItem');
+
+    pluginData.forEach((pd, idx) => {
+      const plug = Object.create(Plugin.prototype);
+      for (const [k, v] of Object.entries(pd)) {
+        Object.defineProperty(plug, k, { value: v, enumerable: true });
+      }
+      Object.defineProperty(plug, 0, { value: mimes[0], enumerable: true });
+      Object.defineProperty(plug, 1, { value: mimes[1], enumerable: true });
+      Object.defineProperty(plug, 'length', { value: 2 });
+      plug.item = function item(i) { return i === 0 ? mimes[0] : (i === 1 ? mimes[1] : null); };
+      plug.namedItem = function namedItem(n) { return m[n] || null; };
+      markNative(plug.item, 'item');
+      markNative(plug.namedItem, 'namedItem');
+      plugins.push(plug);
+      Object.defineProperty(p, idx, { value: plug, enumerable: true });
+      Object.defineProperty(p, pd.name, { value: plug, enumerable: true });
+    });
+    Object.defineProperty(p, 'length', { value: plugins.length });
+    p.item = function item(index) { return plugins[index] || null; };
+    p.namedItem = function namedItem(name) { return p[name] || null; };
+    markNative(p.item, 'item');
+    markNative(p.namedItem, 'namedItem');
+    p[Symbol.iterator] = function*() { for (let x of plugins) yield x; };
+    m[Symbol.iterator] = function*() { for (let x of mimes) yield x; };
+
+    const navProto = Object.getPrototypeOf(navigator);
+    Object.defineProperty(navProto, 'plugins', { get: () => p, enumerable: true, configurable: true });
+    Object.defineProperty(navProto, 'mimeTypes', { get: () => m, enumerable: true, configurable: true });
   } catch (e) {}
 
+  // window.chrome with runtime, app, csi, loadTimes
   try {
+    const csi = function csi() {};
+    const loadTimes = function loadTimes() {};
+    markNative(csi, 'csi');
+    markNative(loadTimes, 'loadTimes');
     window.chrome = {
       app: {
         isInstalled: false,
@@ -150,67 +220,48 @@ STEALTH_JS = r"""
         PlatformOs: { ANDROID: 'android', CROS: 'cros', LINUX: 'linux', MAC: 'mac', OPENBSD: 'openbsd', WIN: 'win' },
         RequestUpdateCheckStatus: { NO_UPDATE: 'no_update', THROTTLED: 'throttled', UPDATE_AVAILABLE: 'update_available' },
       },
-      loadTimes: function() {},
-      csi: function() {},
+      loadTimes,
+      csi,
     };
   } catch (e) {}
 
+  // Notification.permission: match permissions.query prompt state so HEADCHR_PERMISSIONS check passes
   try {
-    const fakePlugins = [
-      { name: 'PDF Viewer', filename: 'pdf-viewer', description: 'Portable Document Format' },
-      { name: 'Chrome PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
-      { name: 'Chromium PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
-      { name: 'Microsoft Edge PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
-      { name: 'WebKit built-in PDF', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
-    ];
-    Object.defineProperty(navigator, 'plugins', {
-      get: () => fakePlugins,
-      configurable: true,
-    });
-    Object.defineProperty(navigator, 'mimeTypes', {
-      get: () => [
-        { type: 'application/pdf', suffixes: 'pdf', description: 'Portable Document Format', enabledPlugin: fakePlugins[0] }
-      ],
-      configurable: true,
-    });
-  } catch (e) {}
-
-  try {
-    Object.defineProperty(navigator, 'languages', {
-      get: () => ['en-IN', 'en-GB', 'en-US', 'en', 'hi'],
-      configurable: true,
-    });
-    Object.defineProperty(navigator, 'platform', {
-      get: () => 'Win32',
-      configurable: true,
-    });
-  } catch (e) {}
-
-  try {
-    const origQuery = window.navigator.permissions && window.navigator.permissions.query;
-    if (origQuery) {
-      window.navigator.permissions.query = (params) => (
-        params && params.name === 'notifications'
-          ? Promise.resolve({ state: Notification.permission })
-          : origQuery(params)
-      );
+    if (typeof Notification !== 'undefined') {
+      Object.defineProperty(Notification, 'permission', {
+        get: () => 'default',
+        configurable: true,
+      });
     }
   } catch (e) {}
 
+  // Hardware concurrency, memory, languages, and platform on prototype
+  try {
+    const navProto = Object.getPrototypeOf(navigator);
+    if (!navigator.deviceMemory) {
+      Object.defineProperty(navProto, 'deviceMemory', { get: () => 8, enumerable: true, configurable: true });
+    }
+    Object.defineProperty(navProto, 'languages', { get: () => ['en-IN', 'en-US', 'en', 'hi'], enumerable: true, configurable: true });
+    Object.defineProperty(navProto, 'platform', { get: () => 'Win32', enumerable: true, configurable: true });
+  } catch (e) {}
+
+  // WebGL vendor and renderer unmasking with native getParameter wrapper
   try {
     const spoofGL = (proto) => {
       if (!proto) return;
       const orig = proto.getParameter;
-      proto.getParameter = function(param) {
+      proto.getParameter = function getParameter(param) {
         if (param === 37445) return 'Google Inc. (Intel)';
         if (param === 37446) return 'ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)';
-        return orig.apply(this, [param]);
+        return orig.apply(this, arguments);
       };
+      markNative(proto.getParameter, 'getParameter');
     };
     if (typeof WebGLRenderingContext !== 'undefined') spoofGL(WebGLRenderingContext.prototype);
     if (typeof WebGL2RenderingContext !== 'undefined') spoofGL(WebGL2RenderingContext.prototype);
   } catch (e) {}
 
+  // Screen outer dimensions
   try {
     if (window.outerWidth === 0) {
       Object.defineProperty(window, 'outerWidth', { get: () => window.innerWidth });
@@ -325,26 +376,15 @@ async def shared_browser():
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--disable-blink-features=AutomationControlled",
-            "--disable-features=IsolateOrigins,site-per-process,Translate,BackForwardCache",
             "--disable-infobars",
             "--no-first-run",
             "--no-service-autorun",
             "--password-store=basic",
-            "--disable-gpu",
-            "--disable-software-rasterizer",
-            "--disable-accelerated-2d-canvas",
-            "--renderer-process-limit=1",
-            "--no-zygote",
-            "--in-process-gpu",
-            "--disable-site-isolation-trials",
             f"--js-flags=--max-old-space-size={js_mb}",
-            "--disk-cache-size=1",
-            "--media-cache-size=1",
-            "--disable-extensions",
-            "--disable-background-networking",
-            "--disable-default-apps",
-            "--disable-sync",
             "--autoplay-policy=no-user-gesture-required",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
         ]
         if not headless:
             args.extend(["--window-position=-32000,-32000", "--window-size=1280,800"])
@@ -422,15 +462,19 @@ class Browser:
             proxy=proxy,
             extra_http_headers={
                 "Accept-Language": "en-IN,en-US;q=0.9,en;q=0.8,hi;q=0.7",
+                "Sec-CH-UA": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                "Sec-CH-UA-Mobile": "?0",
+                "Sec-CH-UA-Platform": '"Windows"',
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-User": "?1",
+                "Sec-Fetch-Dest": "document",
             },
         )
-        # Block telemetry, ads, and web fonts to keep RAM low while allowing audio/video media streams.
+        # Suppress heavy invasive telemetry without triggering net::ERR_FAILED errors or blocking fonts
         async def block_trackers(route):
-            req = route.request
-            if req.resource_type == "font":
-                await route.abort()
-                return
-            u = req.url.lower()
+            u = route.request.url.lower()
             if any(t in u for t in (
                 "google-analytics.com",
                 "googlesyndication.com",
@@ -441,7 +485,11 @@ class Browser:
                 "hotjar.com",
                 "clarity.ms",
             )):
-                await route.abort()
+                await route.fulfill(
+                    status=200,
+                    content_type="text/javascript",
+                    body=b"/* tracker filtered */",
+                )
             else:
                 await route.continue_()
 

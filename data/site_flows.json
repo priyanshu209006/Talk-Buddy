@@ -293,6 +293,34 @@
    "steps": [
     {
      "do": "open",
+     "url": "https://www.pvrcinemas.com/moviesessions/Bhubaneswar/RAMAYANA/35308"
+    },
+    {
+     "do": "click",
+     "target": "Book"
+    },
+    {
+     "do": "wait_for",
+     "text": "AM"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "click",
+     "target": "INOX BMC Bhawani Mall Bhubaneswar"
+    },
+    {
+     "do": "wait_for",
+     "text": "AM"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "open",
      "url": "https://www.pvrcinemas.com/"
     },
     {
