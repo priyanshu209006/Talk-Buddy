@@ -8,16 +8,62 @@
     },
     {
      "do": "click",
+     "target": "Trains B/w Stations"
+    },
+    {
+     "do": "wait_for",
+     "text": "From Station"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "NEW DELHI",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "MUMBAI CENTRAL",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    },
+    {
+     "do": "type",
+     "target": "Search for trains..",
+     "text": "12952",
+     "pick": false
+    },
+    {
+     "do": "click",
+     "target": "See Train Status >>"
+    },
+    {
+     "do": "click",
+     "target": "See Train Status >>"
+    },
+    {
+     "do": "click",
+     "target": "See Train Status >>"
+    },
+    {
+     "do": "click",
      "target": "Spot Your Train"
     },
     {
      "do": "wait_for",
-     "text": "Train No./Name"
+     "text": "Train No"
     },
     {
      "do": "type",
      "target": "Train No./Name",
-     "text": "12951",
+     "text": "12952",
      "pick": true
     }
    ]
@@ -30,20 +76,54 @@
     },
     {
      "do": "wait_for",
-     "text": "Train No./Name"
+     "text": "Train No"
     }
    ]
   },
   {
    "steps": [
     {
+     "do": "open",
+     "url": "https://enquiry.indianrail.gov.in/mntes/"
+    },
+    {
      "do": "click",
-     "target": "Spot Your Train"
+     "target": "Trains B/w Stations"
+    },
+    {
+     "do": "wait_for",
+     "text": "From Station"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "NEW DELHI",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "MUMBAI CENTRAL",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "type",
+     "target": "Train No./Name",
+     "text": "12904",
+     "pick": true
     },
     {
      "do": "type",
      "target": "Train No./Name",
-     "text": "12952",
+     "text": "12138",
      "pick": true
     }
    ]
@@ -59,79 +139,59 @@
      "target": "Trains B/w Stations"
     },
     {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Patna Jn",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "New Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    }
-   ]
-  },
-  {
-   "steps": [
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Patna Jn",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "New Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    }
-   ]
-  },
-  {
-   "steps": [
-    {
-     "do": "click",
-     "target": "Trains B/w Stations"
+     "do": "wait_for",
+     "text": "From Station"
     },
     {
      "do": "type",
      "target": "From Station*",
-     "text": "Patna",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
      "text": "Delhi",
      "pick": true
     },
     {
+     "do": "type",
+     "target": "To Station*",
+     "text": "Mumbai",
+     "pick": true
+    },
+    {
      "do": "click",
      "target": "Get Trains"
     },
     {
-     "do": "click",
-     "target": "Clear"
-    },
-    {
      "do": "type",
      "target": "From Station*",
-     "text": "Patna Jn",
+     "text": "NEW DELHI",
      "pick": true
     },
     {
      "do": "type",
      "target": "To Station*",
-     "text": "New Delhi",
+     "text": "MUMBAI CST",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "MUMBAI CENTRAL",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "MUMBAI CENTRAL",
      "pick": true
     },
     {
@@ -142,6 +202,39 @@
   }
  ],
  "www.myscheme.gov.in": [
+  {
+   "steps": [
+    {
+     "do": "type",
+     "target": "beneficiary state filter",
+     "text": "Bihar",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Search"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.myscheme.gov.in/search"
+    },
+    {
+     "do": "type",
+     "target": "Search",
+     "text": "widow pension"
+    },
+    {
+     "do": "type",
+     "target": "beneficiary state filter",
+     "text": "Bihar",
+     "pick": true
+    }
+   ]
+  },
   {
    "steps": [
     {
@@ -176,25 +269,6 @@
      "target": "Indira Gandhi National Widow Pension Scheme- Bihar"
     }
    ]
-  },
-  {
-   "steps": [
-    {
-     "do": "open",
-     "url": "https://www.myscheme.gov.in/search"
-    },
-    {
-     "do": "type",
-     "target": "Search",
-     "text": "widow pension"
-    },
-    {
-     "do": "type",
-     "target": "beneficiary state filter",
-     "text": "Bihar",
-     "pick": true
-    }
-   ]
   }
  ],
  "hi.wikipedia.org": [
@@ -227,6 +301,42 @@
   }
  ],
  "www.youtube.com": [
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.youtube.com/results?search_query=Harjeet+Singh+songs"
+    },
+    {
+     "do": "click",
+     "target": "Lagi Aaj Sawan Ki Phir Vo Jhadi Hai.Cover Instrumental Harjeet Singh Pappu · 3:35"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.youtube.com/results?search_query=Sydney+Sweeney+new+ad+2025"
+    },
+    {
+     "do": "click",
+     "target": "Sydney Sweeney’s New Novig Ad 🔥 | Just Sports Commercial"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.youtube.com/results?search_query=poha+banane+ki+recipe+hindi"
+    },
+    {
+     "do": "click",
+     "target": "Kanda Poha Recipe | कांदा पोहा बनाने की आसान रेसिपी | How to Make Poha at Home for Breakfast"
+    }
+   ]
+  },
   {
    "steps": [
     {
@@ -325,6 +435,39 @@
   }
  ],
  "www.confirmtkt.com": [
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.confirmtkt.com/train-running-status/12952"
+    },
+    {
+     "do": "wait_for",
+     "text": "Live"
+    },
+    {
+     "do": "select",
+     "target": "stationcode",
+     "option": "New Delhi"
+    },
+    {
+     "do": "click",
+     "target": "Check Live Status"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.confirmtkt.com/train-running-status/12951"
+    },
+    {
+     "do": "wait_for",
+     "text": "Live"
+    }
+   ]
+  },
   {
    "steps": [
     {

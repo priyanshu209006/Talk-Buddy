@@ -298,12 +298,13 @@ SNAPSHOT_JS = r"""
                      .replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ').toLowerCase();
     return '';
   };
-  const sel = 'a[href], button, input:not([type=hidden]), select, textarea, [role=button], [onclick]';
+  const sel = 'a[href], button, input:not([type=hidden]), select, textarea, [role=button], [role=tab], [role=link], [onclick], [class*="cursor-pointer"], [class*="side-tabs"], [class*="tab"]';
   document.querySelectorAll(sel).forEach(el => {
     if (!vis(el)) return;
+    const tag = el.tagName.toLowerCase();
+    if (el.children.length > 4 && (tag === 'div' || tag === 'ul' || tag === 'section')) return;
     const id = 'e' + (++n);
     el.setAttribute('data-dab', id);
-    const tag = el.tagName.toLowerCase();
     let desc;
     if (tag === 'select') {
       const opts = [...el.options].slice(0, 25).map(o => clean(o.text)).join(' | ');
@@ -321,16 +322,17 @@ SNAPSHOT_JS = r"""
       desc = `link "${clean(el.innerText) || el.getAttribute('aria-label') || el.href}"`;
     } else {
       const t = clean(el.innerText) || el.getAttribute('aria-label') || el.title || '';
-      if (!t) { el.removeAttribute('data-dab'); n--; return; }        // icon-only, unlabeled
+      if (!t || t.length > 80) { el.removeAttribute('data-dab'); n--; return; }        // icon-only or too long
       desc = `button "${t}"`;
     }
     elements.push(`[${id}] ${desc}`);
   });
 
-  // Visible reading-order text: headings, paragraphs, table rows, list items, alerts.
+  // Visible reading-order text: headings, paragraphs, table rows, list items, content blocks, alerts.
   const lines = [];
   const seen = new Set();
-  document.querySelectorAll('h1,h2,h3,h4,p,li,tr,[role=alert],.alert,.notice,label,dt,dd,caption').forEach(el => {
+  const textSel = 'h1,h2,h3,h4,h5,h6,p,li,tr,[role=alert],.alert,.notice,label,dt,dd,caption,blockquote,.markdown-options,.content,.description';
+  document.querySelectorAll(textSel).forEach(el => {
     if (!vis(el)) return;
     if (el.closest('tr') && el.tagName !== 'TR') return;
     let t;
