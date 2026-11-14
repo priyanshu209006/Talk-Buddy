@@ -462,14 +462,6 @@ class Browser:
             proxy=proxy,
             extra_http_headers={
                 "Accept-Language": "en-IN,en-US;q=0.9,en;q=0.8,hi;q=0.7",
-                "Sec-CH-UA": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-                "Sec-CH-UA-Mobile": "?0",
-                "Sec-CH-UA-Platform": '"Windows"',
-                "Upgrade-Insecure-Requests": "1",
-                "Sec-Fetch-Site": "none",
-                "Sec-Fetch-Mode": "navigate",
-                "Sec-Fetch-User": "?1",
-                "Sec-Fetch-Dest": "document",
             },
         )
         # Suppress heavy invasive telemetry without triggering net::ERR_FAILED errors or blocking fonts
@@ -821,10 +813,17 @@ class Browser:
             url = scheme + url
         url = self._rewrite_image_url(url)
         await self._recycle_page()
-        try:
-            await self.page.goto(url, wait_until="domcontentloaded", timeout=timeout)
-        except PWTimeout:
-            pass
+        for attempt in range(2):
+            try:
+                await self.page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+                break
+            except PWTimeout:
+                break
+            except Exception as e:
+                if attempt == 0 and any(err in str(e) for err in ("ERR_NETWORK_CHANGED", "ERR_CONNECTION_RESET", "ERR_CONNECTION_CLOSED")):
+                    await asyncio.sleep(0.5)
+                    continue
+                raise
         if "google.com/sorry" in self.page.url or "sorry/index" in self.page.url:
             q_match = re.search(r"[?&]q=([^&#]+)", url)
             if q_match:
@@ -970,6 +969,9 @@ class Browser:
         # as soon as results render, and a locator press would wait 30 s for it.
         if pick_suggestion:
             await self.page.keyboard.press("ArrowDown")
+            await self.page.wait_for_timeout(150)
+            await self.page.keyboard.press("Enter")
+            await self.page.wait_for_timeout(250)
         await self.page.keyboard.press("Enter")
         await self._settle()
         return await self.snapshot()

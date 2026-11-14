@@ -8,43 +8,17 @@
     },
     {
      "do": "click",
-     "target": "Trains B/w Stations"
+     "target": "Spot Your Train"
+    },
+    {
+     "do": "wait_for",
+     "text": "Train No./Name"
     },
     {
      "do": "type",
-     "target": "From Station*",
-     "text": "Patna Jn",
+     "target": "Train No./Name",
+     "text": "12951",
      "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "New Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    }
-   ]
-  },
-  {
-   "steps": [
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Patna Jn",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "New Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
     }
    ]
   },
@@ -52,43 +26,11 @@
    "steps": [
     {
      "do": "click",
-     "target": "Trains B/w Stations"
+     "target": "Spot Your Train"
     },
     {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Patna",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    },
-    {
-     "do": "click",
-     "target": "Clear"
-    },
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Patna Jn",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "New Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
+     "do": "wait_for",
+     "text": "Train No./Name"
     }
    ]
   },
@@ -96,47 +38,13 @@
    "steps": [
     {
      "do": "click",
-     "target": "Clear"
+     "target": "Spot Your Train"
     },
     {
      "do": "type",
-     "target": "From Station*",
-     "text": "Patna Jn",
+     "target": "Train No./Name",
+     "text": "12952",
      "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "New Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
-    }
-   ]
-  },
-  {
-   "steps": [
-    {
-     "do": "click",
-     "target": "Trains B/w Stations"
-    },
-    {
-     "do": "type",
-     "target": "From Station*",
-     "text": "Patna",
-     "pick": true
-    },
-    {
-     "do": "type",
-     "target": "To Station*",
-     "text": "Delhi",
-     "pick": true
-    },
-    {
-     "do": "click",
-     "target": "Get Trains"
     }
    ]
   },
@@ -153,7 +61,51 @@
     {
      "do": "type",
      "target": "From Station*",
-     "text": "Gaya",
+     "text": "Patna Jn",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "New Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Patna Jn",
+     "pick": true
+    },
+    {
+     "do": "type",
+     "target": "To Station*",
+     "text": "New Delhi",
+     "pick": true
+    },
+    {
+     "do": "click",
+     "target": "Get Trains"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "click",
+     "target": "Trains B/w Stations"
+    },
+    {
+     "do": "type",
+     "target": "From Station*",
+     "text": "Patna",
      "pick": true
     },
     {
@@ -173,7 +125,7 @@
     {
      "do": "type",
      "target": "From Station*",
-     "text": "Gaya",
+     "text": "Patna Jn",
      "pick": true
     },
     {
@@ -354,6 +306,46 @@
     {
      "do": "wait_for",
      "text": "PVR"
+    }
+   ]
+  }
+ ],
+ "in.bookmyshow.com": [
+  {
+   "steps": [
+    {
+     "do": "click",
+     "target": "Book tickets"
+    },
+    {
+     "do": "wait_for",
+     "text": "Today"
+    }
+   ]
+  }
+ ],
+ "www.confirmtkt.com": [
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.confirmtkt.com/train-running-status/12952"
+    },
+    {
+     "do": "wait_for",
+     "text": "Live"
+    }
+   ]
+  },
+  {
+   "steps": [
+    {
+     "do": "open",
+     "url": "https://www.confirmtkt.com/train-running-status/12952"
+    },
+    {
+     "do": "click",
+     "target": "Check Live Status"
     }
    ]
   }
