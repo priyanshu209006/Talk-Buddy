@@ -649,7 +649,7 @@ function playDtmfTone(char) {
 
 // ---- Audio Jitter Buffer & Playback ----
 
-// Assistant Speech: gapless scheduling with micro-fades
+// Assistant Speech: gapless scheduling
 function playPcm(buf) {
   if (!ctx || !outGain) return;
   const samples = Math.floor(buf.byteLength / 2);
@@ -659,21 +659,13 @@ function playPcm(buf) {
   const ch = ab.getChannelData(0);
   for (let i = 0; i < samples; i++) ch[i] = i16[i] / 32768;
 
-  // Boundary micro-ramp: prevents DC pop at chunk edges
-  const fade = Math.min(16, Math.floor(samples / 2));
-  for (let i = 0; i < fade; i++) {
-    const f = i / fade;
-    ch[i] *= f;
-    ch[samples - 1 - i] *= f;
-  }
-
   const src = ctx.createBufferSource();
   src.buffer = ab;
   src.connect(outGain);
 
   const now = ctx.currentTime;
   if (playHead < now) {
-    playHead = now + 0.08;
+    playHead = now + 0.035;
   }
   src.start(playHead);
   playHead += ab.duration;
@@ -728,22 +720,15 @@ function playMediaPcm(b64, rate) {
     const ch = ab.getChannelData(0);
     for (let i = 0; i < samples; i++) ch[i] = i16[i] / 32768;
 
-    const fade = Math.min(16, Math.floor(samples / 2));
-    for (let i = 0; i < fade; i++) {
-      const f = i / fade;
-      ch[i] *= f;
-      ch[samples - 1 - i] *= f;
-    }
-
     const src = ctx.createBufferSource();
     src.buffer = ab;
     src.connect(mediaGain);
 
     const now = ctx.currentTime;
     if (mediaHead < now) {
-      mediaHead = now + 0.10;
-    } else if (mediaHead - now > 0.45) {
-      mediaHead = now + 0.12;
+      mediaHead = now + 0.04;
+    } else if (mediaHead - now > 0.40) {
+      mediaHead = now + 0.06;
     }
     src.start(mediaHead);
     mediaHead += ab.duration;

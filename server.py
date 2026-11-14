@@ -56,16 +56,22 @@ _TTS_CACHE: dict[tuple[str, str], bytes] = {}
 async def cached_tts(text: str, voice_kind: str, voice_name: str):
     """Yield PCM chunks; short lines are synthesized once and then replayed instantly."""
     key = (text, voice_name)
+    step = gnani.TTS_RATE * 2 // 10          # ~100 ms chunks for smooth streaming
     if key in _TTS_CACHE:
         pcm = _TTS_CACHE[key]
-        step = gnani.TTS_RATE * 2 // 5          # 200 ms chunks
         for i in range(0, len(pcm), step):
             yield pcm[i:i + step]
         return
     buf = bytearray()
+    out_buf = bytearray()
     async for chunk in gnani.synthesize(text, voice_kind, voice_name=voice_name):
         buf.extend(chunk)
-        yield chunk
+        out_buf.extend(chunk)
+        if len(out_buf) >= step:
+            yield bytes(out_buf)
+            out_buf.clear()
+    if out_buf:
+        yield bytes(out_buf)
     if len(text) <= 140:
         _TTS_CACHE[key] = bytes(buf)
 
